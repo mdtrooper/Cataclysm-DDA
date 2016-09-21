@@ -300,6 +300,7 @@ bool game::opening_screen()
     vWorldSubItems.push_back( pgettext( "Main Menu|World", "<C|c>reate World" ) );
     vWorldSubItems.push_back( pgettext( "Main Menu|World", "<D|d>elete World" ) );
     vWorldSubItems.push_back( pgettext( "Main Menu|World", "<R|r>eset World" ) );
+    vWorldSubItems.push_back( pgettext( "Main Menu|World", "<L|l>ist Worlds" ) );
     std::vector<std::vector<std::string>> vWorldHotkeys;
     for( auto item : vWorldSubItems ) {
         vWorldHotkeys.push_back( get_hotkeys( item ) );
@@ -607,6 +608,10 @@ bool game::opening_screen()
                     } else if( sel2 == 1 || sel2 == 2 ) { // Delete World | Reset World
                         layer = 3;
                         sel3 = 0;
+                    }
+                    else if (sel2 == 3) { // List worlds and details
+                        DebugLog(D_ERROR, DC_ALL) << "list worlds";
+                        world_generator->show_list_worlds();
                     }
                 }
             } else if( sel1 == 4 ) { // Special game

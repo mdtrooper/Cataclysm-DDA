@@ -60,7 +60,9 @@ class worldfactory
         void set_active_world( WORLDPTR world );
         bool save_world( WORLDPTR world = NULL, bool is_conversion = false );
         std::map<std::string, WORLDPTR> get_all_worlds();
-
+		
+		void show_list_worlds(void);
+		
         WORLDPTR pick_world( bool show_prompt = true );
 
         WORLDPTR active_world;

@@ -371,6 +371,50 @@ std::map<std::string, WORLDPTR> worldfactory::get_all_worlds()
     return retworlds;
 }
 
+void worldfactory::show_list_worlds(void)
+{
+	std::map<std::string, WORLDPTR> worlds = get_all_worlds();
+	std::vector<std::string> world_names = all_worldnames;
+
+    // Filter out special worlds (TUTORIAL | DEFENSE) from world_names.
+    for (std::vector<std::string>::iterator it = world_names.begin(); it != world_names.end();) {
+        if (*it == "TUTORIAL" || *it == "DEFENSE") {
+            it = world_names.erase(it);
+        } else if (world_need_lua_build(*it)) {
+            it = world_names.erase(it);
+        } else {
+            ++it;
+        }
+    }
+	
+	const int iTooltipHeight = 3;
+    const int iContentHeight = FULL_SCREEN_HEIGHT - 3 - iTooltipHeight;
+    const unsigned int num_pages = world_names.size() / iContentHeight + 1; // at least 1 page
+    const int iOffsetX = (TERMX > FULL_SCREEN_WIDTH) ? (TERMX - FULL_SCREEN_WIDTH) / 2 : 0;
+    const int iOffsetY = (TERMY > FULL_SCREEN_HEIGHT) ? (TERMY - FULL_SCREEN_HEIGHT) / 2 : 0;
+    
+    WINDOW *w_worlds_border = newwin(FULL_SCREEN_HEIGHT, FULL_SCREEN_WIDTH, iOffsetY, iOffsetX);
+    WINDOW *w_worlds_tooltip = newwin(iTooltipHeight, FULL_SCREEN_WIDTH - 2, 1 + iOffsetY,
+                                      1 + iOffsetX);
+    WINDOW *w_worlds_header = newwin(1, FULL_SCREEN_WIDTH - 2, 1 + iTooltipHeight + iOffsetY,
+                                     1 + iOffsetX);
+    WINDOW *w_worlds        = newwin(iContentHeight, FULL_SCREEN_WIDTH - 2,
+                                     iTooltipHeight + 2 + iOffsetY, 1 + iOffsetX);
+
+    draw_border( w_worlds_border, BORDER_COLOR, _( " LIST WORLDS " ) );
+    
+    wrefresh(w_worlds_border);
+    
+    wrefresh(w_worlds_header);
+    
+    wrefresh(w_worlds);
+    
+    werase(w_worlds);
+    werase(w_worlds_border);
+    werase(w_worlds_header);
+    werase(w_worlds_tooltip);
+}
+
 WORLDPTR worldfactory::pick_world( bool show_prompt )
 {
     std::map<std::string, WORLDPTR> worlds = get_all_worlds();
