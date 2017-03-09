@@ -1,3 +1,4 @@
+#pragma once
 #ifndef CHARACTER_H
 #define CHARACTER_H
 
@@ -7,6 +8,7 @@
 #include "bionics.h"
 #include "skill.h"
 #include "map_selector.h"
+#include "pathfinding.h"
 
 #include <map>
 
@@ -142,7 +144,7 @@ class Character : public Creature, public visitable<Character>
         virtual void set_stomach_food(int n_stomach_food);
         virtual void set_stomach_water(int n_stomach_water);
 
-        void mod_stat( const std::string &stat, int modifier ) override;
+        void mod_stat( const std::string &stat, float modifier ) override;
 
         /* Adjusts provided sight dispersion to account for player stats */
         int effective_dispersion( int dispersion ) const;
@@ -151,8 +153,8 @@ class Character : public Creature, public visitable<Character>
         double aim_per_move( const item &gun, double recoil ) const;
 
         /** Combat getters */
-        int get_dodge_base() const override;
-        int get_hit_base() const override;
+        float get_dodge_base() const override;
+        float get_hit_base() const override;
 
         /** Handles health fluctuations over time */
         virtual void update_health(int external_modifiers = 0);
@@ -163,6 +165,11 @@ class Character : public Creature, public visitable<Character>
         void reset_stats() override;
         /** Handles stat and bonus reset. */
         void reset() override;
+
+        /** Picks a random body part, adjusting for mutations, broken body parts etc. */
+        body_part get_random_body_part( bool main ) const override;
+        /** Returns all body parts this character has, in order they should be displayed. */
+        std::vector<body_part> get_all_body_parts( bool main = false ) const override;
 
         /** Recalculates encumbrance cache. */
         void reset_encumbrance();
@@ -211,7 +218,7 @@ class Character : public Creature, public visitable<Character>
          * This is adjusted by the light level at the *character's* position
          * to simulate glare, etc, night vision only works if you are in the dark.
          */
-        float get_vision_threshold(int light_level) const;
+        float get_vision_threshold( float light_level ) const;
         // --------------- Mutation Stuff ---------------
         // In newcharacter.cpp
         /** Returns the id of a random starting trait that costs >= 0 points */
@@ -236,6 +243,11 @@ class Character : public Creature, public visitable<Character>
         /** Add or removes a mutation on the player, but does not trigger mutation loss/gain effects. */
         void set_mutation(const std::string &flag);
         void unset_mutation(const std::string &flag);
+
+        /** Converts a body_part to an hp_part */
+        static hp_part bp_to_hp(body_part bp);
+        /** Converts an hp_part to a body_part */
+        static body_part hp_to_bp(hp_part hpart);
 
         /**
          * Displays menu with body part hp, optionally with hp estimation after healing.
@@ -406,13 +418,19 @@ class Character : public Creature, public visitable<Character>
         int throw_range( const item & ) const;
 
         int weight_carried() const;
-        int volume_carried() const;
+        units::volume volume_carried() const;
         int weight_capacity() const override;
-        int volume_capacity() const;
-        int volume_capacity_reduced_by( int mod ) const;
+        units::volume volume_capacity() const;
+        units::volume volume_capacity_reduced_by( units::volume mod ) const;
 
         bool can_pickVolume( const item &it, bool safe = false ) const;
         bool can_pickWeight( const item &it, bool safe = true ) const;
+        /**
+         * Checks if character stats and skills meet minimum requirements for the item.
+         * Prints an appropriate message if requirements not met.
+         * @param context optionally override effective item when checking contextual skills
+         */
+        bool can_use( const item& it, const item &context = item() ) const;
 
         void drop_inventory_overflow();
 
@@ -424,23 +442,34 @@ class Character : public Creature, public visitable<Character>
         /** Returns true if the player is wearing the item on the given body_part. */
         bool is_wearing_on_bp(const itype_id &it, body_part bp) const;
         /** Returns true if the player is wearing an item with the given flag. */
-        bool worn_with_flag( const std::string &flag ) const;
+        bool worn_with_flag( const std::string &flag, body_part bp = num_bp ) const;
 
         // --------------- Skill Stuff ---------------
         SkillLevel &get_skill_level( const skill_id &ident );
 
         /** for serialization */
-        SkillLevel const& get_skill_level(const skill_id &ident) const;
+        SkillLevel const& get_skill_level(const skill_id &ident, const item &context = item() ) const;
         void set_skill_level( const skill_id &ident, int level );
         void boost_skill_level( const skill_id &ident, int delta );
 
-        bool meets_skill_requirements( const std::map<skill_id, int> &req ) const;
-
-        /** Return character dispersion penalty dependent upon relevant gun skill level */
-        int skill_dispersion( const item& gun ) const;
+        /** Calculates skill difference
+         * @param req Required skills to be compared with.
+         * @param context An item to provide context for contextual skills. Can be null.
+         * @return Difference in skills. Positive numbers - exceeds; negative - lacks; empty map - no difference.
+         */
+        std::map<skill_id, int> compare_skill_requirements( const std::map<skill_id, int> &req,
+                                                            const item &context = item() ) const;
+        /** Checks whether the character's skills meet the required */
+        bool meets_skill_requirements( const std::map<skill_id, int> &req,
+                                       const item &context = item() ) const;
+        /** Checks whether the character's stats meets the stats required by the item */
+        bool meets_stat_requirements( const item &it ) const;
+        /** Checks whether the character meets overall requirements to be able to use the item */
+        bool meets_requirements( const item &it, const item &context = item() ) const;
+        /** Returns a string of missed requirements (both stats and skills) */
+        std::string enumerate_unmet_requirements( const item &it, const item &context = item() ) const;
 
         // --------------- Other Stuff ---------------
-
 
         /** return the calendar::turn the character expired */
         int get_turn_died() const
@@ -465,15 +494,23 @@ class Character : public Creature, public visitable<Character>
         /**
          * It is supposed to hide the query_yn to simplify player vs. npc code.
          */
-        virtual bool query_yn( const char *mes, ... ) const = 0;
+        virtual bool query_yn( const char *mes, ... ) const PRINTF_LIKE( 2, 3 ) = 0;
 
         bool is_immune_field( const field_id fid ) const override;
 
         /** Returns true if the player has some form of night vision */
         bool has_nv();
 
+        /**
+         * Returns >0 if character is sitting/lying and relatively inactive.
+         * 1 represents sleep on comfortable bed, so anything above that should be rare.
+         */
+        float rest_quality() const;
+
         /** Color's character's tile's background */
         nc_color symbol_color() const override;
+
+        virtual std::string extended_description() const override;
 
         // In newcharacter.cpp
         void empty_skills();
@@ -577,6 +614,12 @@ class Character : public Creature, public visitable<Character>
 
         // turn the character expired, if -1 it has not been set yet.
         int turn_died = -1;
+
+        /**
+         * Cache for pathfinding settings.
+         * Most of it isn't changed too often, hence mutable.
+         */
+        mutable pathfinding_settings path_settings;
 
     private:
         /** Needs (hunger, thirst, fatigue, etc.) */

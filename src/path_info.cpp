@@ -30,7 +30,7 @@ void PATH_INFO::init_user_dir(const char *ud)
         user_dir = getenv("LOCALAPPDATA");
         // On Windows userdir without dot
         dir = std::string(user_dir) + "/cataclysm-dda/";
-#elif defined MACOSX && defined TILES
+#elif defined MACOSX
         user_dir = getenv( "HOME" );
         dir = std::string( user_dir ) + "/Library/Application Support/Cataclysm/";
 #elif (defined USE_XDG_DIR)
@@ -63,15 +63,12 @@ void PATH_INFO::update_pathname(std::string name, std::string path)
 
 void PATH_INFO::update_datadir()
 {
+    // Shared dirs
     update_pathname("gfxdir", FILENAMES["datadir"] + "gfx/");
     update_pathname("luadir", FILENAMES["datadir"] + "lua/");
-
-    // Shared dirs
-    update_pathname("autoexeclua", FILENAMES["luadir"] + "autoexec.lua");
-    update_pathname("class_defslua", FILENAMES["luadir"] + "class_definitions.lua");
     update_pathname("fontdir", FILENAMES["datadir"] + "font/");
     update_pathname("rawdir", FILENAMES["datadir"] + "raw/");
-    update_pathname("jsondir", FILENAMES["datadir"] + "json/");
+    update_pathname("jsondir", FILENAMES["datadir"] + "core/");
     update_pathname("moddir", FILENAMES["datadir"] + "mods/");
     update_pathname("recycledir", FILENAMES["datadir"] + "recycling/");
     update_pathname("namesdir", FILENAMES["datadir"] + "names/");
@@ -81,6 +78,8 @@ void PATH_INFO::update_datadir()
     update_pathname("sounddir", FILENAMES["datadir"] + "sound");
 
     // Shared files
+    update_pathname("autoexeclua", FILENAMES["luadir"] + "autoexec.lua");
+    update_pathname("class_defslua", FILENAMES["luadir"] + "class_definitions.lua");
     update_pathname("title", FILENAMES["titledir"] + "en.title");
     update_pathname("motd", FILENAMES["motddir"] + "en.motd");
     update_pathname("credits", FILENAMES["creditsdir"] + "en.credits");
@@ -92,9 +91,9 @@ void PATH_INFO::update_datadir()
     update_pathname("sokoban", FILENAMES["rawdir"] + "sokoban.txt");
     update_pathname("defaulttilejson", FILENAMES["gfx"] + "tile_config.json");
     update_pathname("defaulttilepng", FILENAMES["gfx"] + "tinytile.png");
-    update_pathname("mods-dev-default", FILENAMES["moddir"] + "dev-default-mods.json");
+    update_pathname("mods-dev-default", FILENAMES["moddir"] + "default.json");
     update_pathname("mods-user-default", FILENAMES["moddir"] + "user-default-mods.json");
-    update_pathname("obsolete-mods", FILENAMES["moddir"] + "obsolete-mods.json");
+    update_pathname("mods-replacements", FILENAMES["moddir"] + "replacements.json");
     update_pathname("defaultsounddir", FILENAMES["datadir"] + "sound");
 }
 
@@ -134,7 +133,7 @@ void PATH_INFO::set_standard_filenames(void)
     update_pathname("class_defslua", FILENAMES["luadir"] + "class_definitions.lua");
     update_pathname("fontdir", FILENAMES["datadir"] + "font/");
     update_pathname("rawdir", FILENAMES["datadir"] + "raw/");
-    update_pathname("jsondir", FILENAMES["datadir"] + "json/");
+    update_pathname("jsondir", FILENAMES["datadir"] + "core/");
     update_pathname("moddir", FILENAMES["datadir"] + "mods/");
     update_pathname("recycledir", FILENAMES["datadir"] + "recycling/");
     update_pathname("namesdir", FILENAMES["datadir"] + "names/");
@@ -155,9 +154,9 @@ void PATH_INFO::set_standard_filenames(void)
     update_pathname("sokoban", FILENAMES["rawdir"] + "sokoban.txt");
     update_pathname("defaulttilejson", FILENAMES["gfx"] + "tile_config.json");
     update_pathname("defaulttilepng", FILENAMES["gfx"] + "tinytile.png");
-    update_pathname("mods-dev-default", FILENAMES["moddir"] + "dev-default-mods.json");
+    update_pathname("mods-dev-default", FILENAMES["moddir"] + "default.json");
     update_pathname("mods-user-default", FILENAMES["moddir"] + "user-default-mods.json");
-    update_pathname("obsolete-mods", FILENAMES["moddir"] + "obsolete-mods.json");
+    update_pathname("mods-replacements", FILENAMES["moddir"] + "replacements.json");
     update_pathname("defaultsounddir", FILENAMES["datadir"] + "sound");
 
     update_pathname("savedir", FILENAMES["user_dir"] + "save/");

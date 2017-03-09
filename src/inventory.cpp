@@ -131,6 +131,7 @@ inventory inventory::operator+ (const item &rhs)
 void inventory::unsort()
 {
     sorted = false;
+    binned = false;
 }
 
 bool stack_compare(const std::list<item> &lhs, const std::list<item> &rhs)
@@ -147,6 +148,7 @@ void inventory::sort()
 void inventory::clear()
 {
     items.clear();
+    binned = false;
 }
 
 void inventory::add_stack(const std::list<item> newits)
@@ -166,6 +168,7 @@ void inventory::clone_stack (const std::list<item> &rhs)
         newstack.push_back( rh );
     }
     items.push_back(newstack);
+    binned = false;
 }
 
 void inventory::push_back(std::list<item> newits)
@@ -242,6 +245,7 @@ char inventory::find_usable_cached_invlet(const std::string &item_type)
 
 item &inventory::add_item(item newit, bool keep_invlet, bool assign_invlet)
 {
+    binned = false;
     bool reuse_cached_letter = false;
 
     // Avoid letters that have been manually assigned to other things.
@@ -319,6 +323,7 @@ void inventory::restack(player *p)
         return;
     }
 
+    binned = false;
     std::list<item> to_restack;
     int idx = 0;
     for (invstack::iterator iter = items.begin(); iter != items.end(); ++iter, ++idx) {
@@ -402,7 +407,6 @@ void inventory::form_from_map( const tripoint &origin, int range, bool assign_in
             }
         }
         // Kludges for now!
-        ter_id terrain_id = g->m.ter( p );
         if (g->m.has_nearby_fire( p, 0 )) {
             item fire("fire", 0);
             fire.charges = 1;
@@ -412,13 +416,6 @@ void inventory::form_from_map( const tripoint &origin, int range, bool assign_in
         item water = g->m.water_from( p );
         if( !water.is_null() ) {
             add_item( water );
-        }
-        // add cvd forge from terrain
-        if (terrain_id == t_cvdmachine) {
-            item cvd_machine("cvd_machine", 0);
-            cvd_machine.charges = 1;
-            cvd_machine.item_tags.insert("PSEUDO");
-            add_item(cvd_machine);
         }
         // kludge that can probably be done better to check specifically for toilet water to use in
         // crafting
@@ -560,6 +557,7 @@ std::list<item> inventory::reduce_stack_internal(const Locator &locator, int qua
     std::list<item> ret;
     for (invstack::iterator iter = items.begin(); iter != items.end(); ++iter) {
         if (item_matches_locator(iter->front(), locator, pos)) {
+            binned = false;
             if(quantity >= (int)iter->size() || quantity < 0) {
                 ret = *iter;
                 items.erase(iter);
@@ -590,6 +588,7 @@ item inventory::remove_item(const item *it)
 {
     auto tmp = remove_items_with( [&it](const item& i) { return &i == it; }, 1 );
     if( !tmp.empty() ) {
+        binned = false;
         return tmp.front();
     }
     debugmsg("Tried to remove a item not in inventory (name: %s)", it->tname().c_str());
@@ -602,6 +601,7 @@ item inventory::remove_item_internal(const Locator &locator)
     int pos = 0;
     for (invstack::iterator iter = items.begin(); iter != items.end(); ++iter) {
         if (item_matches_locator(iter->front(), locator, pos)) {
+            binned = false;
             if (iter->size() > 1) {
                 std::list<item>::iterator stack_member = iter->begin();
                 char invlet = stack_member->invlet;
@@ -627,18 +627,18 @@ item inventory::remove_item(int position)
     return remove_item_internal(position);
 }
 
-std::list<item> inventory::remove_randomly_by_volume(int volume)
+std::list<item> inventory::remove_randomly_by_volume( const units::volume &volume )
 {
     std::list<item> result;
-    int volume_dropped = 0;
+    units::volume volume_dropped = 0;
     while( volume_dropped < volume ) {
-        int cumulative_volume = 0;
+        units::volume cumulative_volume = 0;
         auto chosen_stack = items.begin();
         auto chosen_item = chosen_stack->begin();
         for( auto stack = items.begin(); stack != items.end(); ++stack ) {
             for( auto stack_it = stack->begin(); stack_it != stack->end(); ++stack_it ) {
                 cumulative_volume += stack_it->volume();
-                if( x_in_y( stack_it->volume(), cumulative_volume ) ) {
+                if( x_in_y( stack_it->volume().value(), cumulative_volume.value() ) ) {
                     chosen_item = stack_it;
                     chosen_stack = stack;
                 }
@@ -652,6 +652,7 @@ std::list<item> inventory::remove_randomly_by_volume(int volume)
             chosen_item->invlet = result.back().invlet;
         }
         if( chosen_stack->empty() ) {
+            binned = false;
             items.erase( chosen_stack );
         }
     }
@@ -779,6 +780,7 @@ std::list<item> inventory::use_amount(itype_id it, int _quantity)
             }
         }
         if (iter->empty()) {
+            binned = false;
             iter = items.erase(iter);
         } else if (iter != items.end()) {
             ++iter;
@@ -810,7 +812,7 @@ int inventory::leak_level(std::string flag) const
         for( const auto &elem_stack_iter : elem ) {
             if( elem_stack_iter.has_flag( flag ) ) {
                 if( elem_stack_iter.has_flag( "LEAK_ALWAYS" ) ) {
-                    ret += elem_stack_iter.volume();
+                    ret += elem_stack_iter.volume() / units::legacy_volume_factor;
                 } else if( elem_stack_iter.has_flag( "LEAK_DAM" ) && elem_stack_iter.damage() > 0 ) {
                     ret += elem_stack_iter.damage();
                 }
@@ -939,9 +941,9 @@ int inventory::weight() const
     return ret;
 }
 
-int inventory::volume() const
+units::volume inventory::volume() const
 {
-    int ret = 0;
+    units::volume ret = 0;
     for( const auto &elem : items ) {
         for( const auto &elem_stack_iter : elem ) {
             ret += elem_stack_iter.volume();
@@ -1019,4 +1021,23 @@ std::set<char> inventory::allocated_invlets() const
         }
     }
     return invlets;
+}
+
+const itype_bin &inventory::get_binned_items() const
+{
+    if( binned ) {
+        return binned_items;
+    }
+
+    binned_items.clear();
+
+    // Hack warning
+    inventory *this_nonconst = const_cast<inventory *>( this );
+    this_nonconst->visit_items( [ this ]( item *e ) {
+        binned_items[ e->typeId() ].push_back( e );
+        return VisitResponse::NEXT;
+    } );
+
+    binned = true;
+    return binned_items;
 }

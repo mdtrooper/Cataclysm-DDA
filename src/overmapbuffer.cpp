@@ -1,5 +1,4 @@
 #include "overmapbuffer.h"
-
 #include "coordinate_conversions.h"
 #include "overmap_types.h"
 #include "overmap.h"
@@ -8,11 +7,13 @@
 #include "debug.h"
 #include "monster.h"
 #include "mongroup.h"
+#include "simple_pathfinding.h"
 #include "worldfactory.h"
 #include "catacharset.h"
 #include "npc.h"
 #include "vehicle.h"
 #include "filesystem.h"
+#include "cata_utility.h"
 
 #include <algorithm>
 #include <cassert>
@@ -120,8 +121,9 @@ void overmapbuffer::clear()
 
 const regional_settings& overmapbuffer::get_settings(int x, int y, int z)
 {
+    (void)z;
     overmap &om = get_om_global(x, y);
-    return om.get_settings(x, y, z);
+    return om.get_settings();
 }
 
 void overmapbuffer::add_note(int x, int y, int z, const std::string& message)
@@ -461,6 +463,55 @@ bool overmapbuffer::reveal( const tripoint &center, int radius )
     return result;
 }
 
+bool overmapbuffer::reveal_route( const tripoint &source, const tripoint &dest, int radius, bool road_only )
+{
+    static const int RADIUS = 4;            // Maximal radius of search (in overmaps)
+    static const int OX = RADIUS * OMAPX;   // half-width of the area to search in
+    static const int OY = RADIUS * OMAPY;   // half-height of the area to search in
+
+    const tripoint start( OX, OY, source.z );   // Local source - center of the local area
+    const tripoint base( source - start );      // To convert local coordinates to global ones
+    const tripoint finish( dest - base );       // Local destination - relative to source
+
+    const auto estimate = [ this, &base, &finish, road_only ]( const pf::node &, const pf::node &cur ) {
+        int res = 0;
+        int omx = base.x + cur.x;
+        int omy = base.y + cur.y;
+
+        const auto &oter = get_om_global( omx, omy ).get_ter( omx, omy, base.z );
+
+        if( !is_ot_type( "road", oter ) && !is_ot_type ( "bridge", oter ) && !is_ot_type( "hiway", oter ) ) {
+            if( road_only ) {
+                return -1;
+            }
+
+            if( is_river( oter ) ) {
+                return -1; // Can't walk on water
+            }
+            // Allow going slightly off-road to overcome small obstacles (e.g. craters),
+            // but heavily penalize that to make roads preferable
+            res += 250;
+        }
+
+        res += std::abs( finish.x - cur.x ) +
+               std::abs( finish.y - cur.y );
+
+        return res;
+    };
+
+    const auto path = pf::find_path( point( start.x, start.y ), point( finish.x, finish.y ), 2*OX, 2*OY, estimate );
+
+    if( path.empty() ) {
+        return false;
+    }
+
+    for( const auto &node : path ) {
+        reveal( base + tripoint( node.x, node.y, base.z ), radius );
+    }
+
+    return true;
+}
+
 bool overmapbuffer::check_ot_type(const std::string& type, int x, int y, int z)
 {
     overmap& om = get_om_global(x, y);
@@ -533,6 +584,12 @@ std::vector<tripoint> overmapbuffer::find_all( const tripoint& origin, const std
         }
     }
     return result;
+}
+
+tripoint overmapbuffer::find_random( const tripoint &origin, const std::string &type,
+                                     int dist, bool must_be_seen )
+{
+    return random_entry( find_all( origin, type, dist, must_be_seen ), overmap::invalid_tripoint );
 }
 
 npc* overmapbuffer::find_npc(int id) {
@@ -769,7 +826,6 @@ void overmapbuffer::despawn_monster(const monster &critter)
     om.monster_map.insert( std::make_pair( sm, critter ) );
 }
 
-extern bool lcmatch(const std::string& text, const std::string& pattern);
 overmapbuffer::t_notes_vector overmapbuffer::get_notes(int z, const std::string* pattern)
 {
     t_notes_vector result;

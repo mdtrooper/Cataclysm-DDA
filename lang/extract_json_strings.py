@@ -3,6 +3,7 @@
 
 import json
 import os
+import subprocess 
 
 # Exceptions
 class WrongJSONItem(Exception):
@@ -21,9 +22,14 @@ not_json = {
     "LOADING_ORDER.md"
 }
 
-# don't parse this files. Full related path.
+git_files_list = {
+    ".",
+}
+
+
+# these files will not be parsed. Full related path.
 ignore_files = {
-    "data/mods/obsolete-mods.json",
+    "data/mods/replacements.json",
     "data/raw/color_templates/no_bright_background.json"
 }
 
@@ -34,6 +40,7 @@ ignorable = {
     "emit",
     "epilogue", # FIXME right now this object can't be translated correctly
     "GAME_OPTION",
+    "harvest",
     "ITEM_BLACKLIST",
     "item_group",
     "ITEM_OPTION",
@@ -47,9 +54,12 @@ ignorable = {
     "npc",      # FIXME right now this object is unextractable
     "overlay_order",
     "overmap_special",
+    "profession_item_substitutions",
+    "palette",
     "region_overlay",
     "region_settings",
     "requirement",
+    "rotatable_symbol",
     "SPECIES",
     "uncraft",
     "vehicle_group",
@@ -67,6 +77,7 @@ ignorable = {
 #   "sound" member
 #   "messages" member containing an array of translatable strings
 automatically_convertible = {
+    "activity_type",
     "AMMO",
     "ammunition_type",
     "ARMOR",
@@ -82,13 +93,11 @@ automatically_convertible = {
     "fault",
     "furniture",
     "GENERIC",
-    "GUN",
-    "GUNMOD",
     "item_action",
     "ITEM_CATEGORY",
+    "json_flag",
     "keybinding",
     "MAGAZINE",
-    "mission_definition",
     "MOD_INFO",
     "MONSTER",
     "mutation",
@@ -101,6 +110,7 @@ automatically_convertible = {
     "STATIONARY_ITEM",
     "terrain",
     "TOOL",
+    "TOOLMOD",
     "TOOL_ARMOR",
     "tool_quality",
     "trap",
@@ -114,11 +124,9 @@ automatically_convertible = {
 
 # for these objects a plural form is needed
 needs_plural = {
-    "AMMO",
     "ARMOR",
     "BIONIC_ITEM",
     "BOOK",
-    "COMESTIBLE",
     "CONTAINER",
     "GENERIC",
     "GUN",
@@ -126,6 +134,7 @@ needs_plural = {
     "MONSTER"
     "STATIONARY_ITEM",
     "TOOL",
+    "TOOLMOD",
     "TOOL_ARMOR",
     "VAR_VEH_PART",
 }
@@ -138,6 +147,13 @@ use_format_strings = {
 ##
 ##  SPECIALIZED EXTRACTION FUNCTIONS
 ##
+
+def extract_bodypart(item):
+    outfile = get_outfile("bodypart")
+    writestr(outfile, item["name"])
+    writestr(outfile, item["encumbrance_text"])
+    writestr(outfile, item["heading_singular"], item["heading_plural"])
+
 
 def extract_material(item):
     outfile = get_outfile("material")
@@ -242,6 +258,56 @@ def extract_effect_type(item):
         writestr(outfile, msg, context="memorial_female",
           comment="Female memorial remove log for effect(s) '{}'.".format(', '.join(name)))
 
+
+def extract_gun(item):
+    outfile = get_outfile("gun")
+    if "name" in item:
+        item_name = item.get("name")
+        writestr(outfile, item_name)
+        if "name_plural" in item:
+            if item.get("name_plural") != "none":
+                writestr(outfile, item_name, item.get("name_plural"))
+            else:
+                writestr(outfile, item_name)
+        else:
+            if item.get("type") in needs_plural:
+                # no name_plural entry in json, use default constructed (name+"s"), as in item_factory.cpp
+                writestr(outfile, item_name, "{}s".format(item_name))
+            else:
+                writestr(outfile, item_name)
+    if "description" in item:
+        description = item.get("description")
+        writestr(outfile, description)
+    if "modes" in item:
+        modes = item.get("modes")
+        for fire_mode in modes:
+            writestr(outfile, fire_mode[1])
+
+
+def extract_gunmod(item):
+    outfile = get_outfile("gunmod")
+    if "name" in item:
+        item_name = item.get("name")
+        writestr(outfile, item_name)
+        if "name_plural" in item:
+            if item.get("name_plural") != "none":
+                writestr(outfile, item_name, item.get("name_plural"))
+            else:
+                writestr(outfile, item_name)
+        else:
+            if item.get("type") in needs_plural:
+                # no name_plural entry in json, use default constructed (name+"s"), as in item_factory.cpp
+                writestr(outfile, item_name, "{}s".format(item_name))
+            else:
+                writestr(outfile, item_name)
+    if "description" in item:
+        description = item.get("description")
+        writestr(outfile, description)
+    if "location" in item:
+        location = item.get("location")
+        writestr(outfile, location)
+
+
 def extract_professions(item):
     outfile = get_outfile("professions")
     nm = item["name"]
@@ -311,6 +377,18 @@ def extract_mapgen(item):
                 sign = obj[k].get("signage", None)
                 writestr(outfile, sign, comment="Sign")
 
+def extract_monster_attack(item):
+    outfile = get_outfile("monster_attack")
+    if "hit_dmg_u" in item:
+        writestr(outfile, item.get("hit_dmg_u"))
+    if "hit_dmg_npc" in item:
+        writestr(outfile, item.get("hit_dmg_npc"))
+    if "no_dmg_msg_u" in item:
+        writestr(outfile, item.get("no_dmg_msg_u"))
+    if "no_dmg_msg_npc" in item:
+        writestr(outfile, item.get("no_dmg_msg_npc"))
+
+
 def extract_recipes(item):
     outfile = get_outfile("recipe")
     if "book_learn" in item:
@@ -350,6 +428,34 @@ def extract_talk_topic(item):
         extract_dynamic_line(item["dynamic_line"], outfile)
     for r in item["responses"]:
         extract_talk_response(r, outfile)
+
+
+def extract_missiondef(item):
+    outfile = get_outfile("mission_def")
+    item_name = item.get("name")
+    if item_name is None:
+        raise WrongJSONItem("JSON item don't contain 'name' field", item)
+    writestr(outfile, item_name)
+    if "dialogue" in item:
+        dialogue = item.get("dialogue")
+        if "describe" in dialogue:
+            writestr(outfile, dialogue.get("describe"))
+        if "offer" in dialogue:
+            writestr(outfile, dialogue.get("offer"))
+        if "accepted" in dialogue:
+            writestr(outfile, dialogue.get("accepted"))
+        if "rejected" in dialogue:
+            writestr(outfile, dialogue.get("rejected"))
+        if "advice" in dialogue:
+            writestr(outfile, dialogue.get("advice"))
+        if "inquire" in dialogue:
+            writestr(outfile, dialogue.get("inquire"))
+        if "success" in dialogue:
+            writestr(outfile, dialogue.get("success"))
+        if "success_lie" in dialogue:
+            writestr(outfile, dialogue.get("success_lie"))
+        if "failure" in dialogue:
+            writestr(outfile, dialogue.get("failure"))
 
 
 def extract_mutation(item):
@@ -420,10 +526,15 @@ def extract_gate(item):
 
 # these objects need to have their strings specially extracted
 extract_specials = {
+    "body_part": extract_bodypart,
     "effect_type": extract_effect_type,
+    "GUN": extract_gun,
+    "GUNMOD": extract_gunmod,
     "mapgen": extract_mapgen,
     "martial_art": extract_martial_art,
     "material": extract_material,
+    "mission_definition": extract_missiondef,
+    "monster_attack": extract_monster_attack,
     "mutation_category": extract_mutation,
     "profession": extract_professions,
     "recipe_category": extract_recipe_category,
@@ -510,6 +621,7 @@ use_action_msgs = {
     "deactive_msg",
     "out_of_power_msg",
     "msg",
+    "menu_text",
     "message",
     "friendly_msg",
     "hostile_msg",
@@ -643,8 +755,21 @@ def extract(item, infilename):
         for mod_loc in item["valid_mod_locations"]:
             writestr(outfile, mod_loc[0], **kwargs)
             wrote = True
+    if "info" in item:
+       c = "Please leave anything in <angle brackets> unchanged."
+       writestr(outfile, item["info"], comment=c, **kwargs)
+       wrote = True
+    if "stop_phrase" in item:
+       writestr(outfile, item["stop_phrase"], **kwargs)
+       wrote = True
     if not wrote:
         print("WARNING: {}: nothing translatable found in item: {}".format(infilename, item))
+
+def is_official_mod(full_path):
+    for i in official_mods:
+        if full_path.find(i) != -1:
+            return True
+    return False
 
 def extract_all_from_dir(json_dir):
     """Extract strings from every json file in the specified directory,
@@ -660,7 +785,10 @@ def extract_all_from_dir(json_dir):
         elif f in skiplist or full_name in ignore_files:
             continue
         elif f.endswith(".json"):
-            extract_all_from_file(full_name)
+            if full_name in git_files_list:
+                extract_all_from_file(full_name)
+            else:
+                print("Skipping untracked file: '{}'".format(full_name))
         elif f not in not_json:
             print("Skipping file: '{}'".format(f))
     for d in dirs:
@@ -694,11 +822,23 @@ def add_fake_types():
     # fake monster types
     writestr(outfile, "human", "humans")
 
+def prepare_git_file_list():
+    command_str = "git ls-files"
+    res = subprocess.Popen(command_str, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True) 
+    output = res.stdout.readlines() 
+    res.communicate()
+    if res.returncode != 0:
+        print("'git ls-files' command exited with non-zero exit code: {}".format(res.returncode))
+        exit(1)
+    for f in output:
+        if len(f) > 0:
+            git_files_list.add(f[:-1].decode('utf8'))
 
 ##
 ##  EXTRACTION
 ##
 
+prepare_git_file_list()
 extract_all_from_dir(json_dir)
 extract_all_from_dir(raw_dir)
 extract_all_from_dir(mods_dir)

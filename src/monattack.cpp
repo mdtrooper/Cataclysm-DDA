@@ -3,6 +3,7 @@
 #include "game.h"
 #include "debug.h"
 #include "map.h"
+#include "fungal_effects.h"
 #include "rng.h"
 #include "line.h"
 #include "bodypart.h"
@@ -479,7 +480,7 @@ bool mattack::acid_barf(monster *z)
     } else {
         target->add_msg_player_or_npc(
             _("The %1$s barfs acid on your %2$s, but it washes off the armor!"),
-            _("The %1$s bites <npcname>'s %2$s, but it washes off the armor!"),
+            _("The %1$s barfs acid on <npcname>'s %2$s, but it washes off the armor!"),
             z->name().c_str(),
             body_part_name_accusative( hit ).c_str() );
     }
@@ -514,7 +515,7 @@ bool mattack::acid_accurate(monster *z)
     proj.proj_effects.insert( "NO_DAMAGE_SCALING" );
     proj.impact.add_damage( DT_ACID, rng( 3, 5 ) );
     // Make it arbitrarily less accurate at close ranges
-    z->projectile_attack( proj, target->pos(), rng( 0, 8000 / range ) );
+    z->projectile_attack( proj, target->pos(), 8000 / range );
 
     return true;
 }
@@ -1364,8 +1365,10 @@ bool mattack::triffid_heartbeat(monster *z)
         // Maybe remove this and allow spawning monsters above?
         return true;
     }
+
+    static pathfinding_settings root_pathfind( 10, 20, 50, false, false, false );
     if (rl_dist( z->pos(), g->u.pos() ) > 5 &&
-        !g->m.route( g->u.pos(), z->pos(), 10, 20 ).empty()) {
+        !g->m.route( g->u.pos(), z->pos(), root_pathfind ).empty()) {
         add_msg(m_warning, _("The root walls creak around you."));
         for( const tripoint &dest : g->m.points_in_radius( z->pos(), 3 ) ) {
             if (g->is_empty(dest) && one_in(4)) {
@@ -1376,7 +1379,7 @@ bool mattack::triffid_heartbeat(monster *z)
         }
         // Open blank tiles as long as there's no possible route
         int tries = 0;
-        while (g->m.route( g->u.pos(), z->pos(), 10, 20 ).empty() &&
+        while (g->m.route( g->u.pos(), z->pos(), root_pathfind ).empty() &&
                tries < 20) {
             int x = rng(g->u.posx(), z->posx() - 3), y = rng(g->u.posy(), z->posy() - 3);
             tripoint dest( x, y, z->posz() );
@@ -1449,6 +1452,7 @@ bool mattack::fungus(monster *z)
         }
     }
 
+    fungal_effects fe( *g, g->m );
     for (int i = -radius; i <= radius; i++) {
         for (int j = -radius; j <= radius; j++) {
             if( i == 0 && j == 0 ) {
@@ -1463,7 +1467,7 @@ bool mattack::fungus(monster *z)
                 continue;
             }
 
-            g->m.fungalize( sporep, z, spore_chance );
+            fe.fungalize( sporep, z, spore_chance );
         }
     }
 
@@ -1955,8 +1959,9 @@ bool mattack::dermatik_growth(monster *z)
 
 bool mattack::plant( monster *z)
 {
+    fungal_effects fe( *g, g->m );
     // Spores taking seed and growing into a fungaloid
-    if( !g->spread_fungus( z->pos() ) && one_in( 10 + g->num_zombies() / 5 ) ) {
+    if( !fe.spread_fungus( z->pos() ) && one_in( 10 + g->num_zombies() / 5 ) ) {
         if( g->u.sees( *z ) ) {
             add_msg(m_warning, _("The %s takes seed and becomes a young fungaloid!"),
                     z->name().c_str());
@@ -1972,7 +1977,7 @@ bool mattack::plant( monster *z)
         }
         z->set_hp( 0 );
         // Try fungifying once again
-        g->spread_fungus( z->pos() );
+        fe.spread_fungus( z->pos() );
         return true;
     }
 }
@@ -2057,16 +2062,15 @@ bool mattack::formblob(monster *z)
             continue;
         }
 
-        monster *mon = dynamic_cast<monster*>( critter );
-        if( mon == nullptr ) {
+        if( critter->is_player() || critter->is_npc() ) {
             // If we hit the player or some NPC, cover them with slime
             didit = true;
             // TODO: Add some sort of a resistance/dodge roll
-            g->u.add_effect( effect_slimed, rng( 0, z->get_hp() ) );
+            critter->add_effect( effect_slimed, rng( 0, z->get_hp() ) );
             break;
         }
 
-        monster &othermon = *mon;
+        monster &othermon = *( dynamic_cast<monster *>( critter ) );
         // Hit a monster.  If it's a blob, give it our speed.  Otherwise, blobify it?
         if( z->get_speed_base() > 40 && othermon.type->in_species( BLOB ) ) {
             if( othermon.type->id == mon_blob_brain ) {
@@ -2715,6 +2719,7 @@ void mattack::rifle( monster *z, Creature *target )
     npc tmp = make_fake_npc(z, 16, 10, 8, 12);
     tmp.set_skill_level( skill_rifle, 8 );
     tmp.set_skill_level( skill_gun, 6 );
+    tmp.recoil = 0; // no need to aim
 
     if( target == &g->u ) {
         if (!z->has_effect( effect_targeted )) {
@@ -2773,6 +2778,7 @@ void mattack::frag( monster *z, Creature *target ) // This is for the bots, not 
     npc tmp = make_fake_npc(z, 16, 10, 8, 12);
     tmp.set_skill_level( skill_launcher, 8 );
     tmp.set_skill_level( skill_gun, 6 );
+    tmp.recoil = 0; // no need to aim
     z->moves -= 150;   // It takes a while
 
     if (z->ammo[ammo_type] <= 0) {
@@ -2835,6 +2841,7 @@ void mattack::tankgun( monster *z, Creature *target )
     npc tmp = make_fake_npc(z, 12, 8, 8, 8);
     tmp.set_skill_level( skill_launcher, 1 );
     tmp.set_skill_level( skill_gun, 1 );
+    tmp.recoil = 0; // no need to aim
     z->moves -= 150;   // It takes a while
 
     if (z->ammo[ammo_type] <= 0) {
@@ -4620,9 +4627,9 @@ bool mattack::stretch_attack(monster *z)
     return true;
 }
 
-bool mattack::dodge_check(monster *z, Creature *target){
+bool mattack::dodge_check( monster *z, Creature *target ) {
     ///\EFFECT_DODGE increases chance of dodging, vs their melee skill
-    int dodge = std::max( target->get_dodge() - rng(0, z->type->melee_skill), 0L );
+    float dodge = std::max( target->get_dodge() - rng( 0, z->get_hit() ), 0.0f );
     if (rng(0, 10000) < 10000 / (1 + (99 * exp(-.6 * dodge)))) {
         return true;
     }

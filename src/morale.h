@@ -1,3 +1,4 @@
+#pragma once
 #ifndef MORALE_H
 #define MORALE_H
 
@@ -150,6 +151,7 @@ class player_morale
                 cold( 0 ) {};
         };
         std::array<body_part_data, num_bp> body_parts;
+        body_part_data no_body_part;
 
         typedef std::function<void( player_morale *morale )> mutation_handler;
         struct mutation_data {

@@ -14,6 +14,7 @@
 #include "mutation.h"
 #include "options.h"
 #include "translations.h"
+#include "units.h"
 
 #include <string>
 #include <algorithm>
@@ -176,10 +177,10 @@ float player::metabolic_rate() const
     // Note: Values do not match hungry/v.hungry/famished/starving,
     // because effective hunger is affected by speed (which drops when hungry)
     static const std::vector<std::pair<float, float>> thresholds = {{
-            { 300, 1.0f },
-            { 2000, 0.8f },
-            { 5000, 0.6f },
-            { 8000, 0.5f }
+            { 300.0f, 1.0f },
+            { 2000.0f, 0.8f },
+            { 5000.0f, 0.6f },
+            { 8000.0f, 0.5f }
         }
     };
 
@@ -383,8 +384,16 @@ edible_rating player::can_eat( const item &food, bool interactive, bool force ) 
         overfull = !maybe_query( _( "You're full.  Force yourself to eat?" ) );
     } else if( ( ( nutr > 0 && temp_hunger < capacity ) ||
                  ( comest->quench > 0 && temp_thirst < capacity ) ) &&
-               !food.has_infinite_charges() && !eathealth && !slimespawner ) {
-        overfull = !maybe_query( _( "You will not be able to finish it all.  Consume it?" ) );
+               !food.has_infinite_charges() ) {
+        // This first section is only for flavor msg, skip if we wouldn't print anything
+        if( interactive &&
+            ( slimespawner ||
+              ( gourmand && has_active_mutation( "GOURMAND" ) ) ||
+              ( eathealth && has_active_mutation( "EATHEALTH" ) ) ) ) {
+            add_msg_if_player( _( "You're full, but you cram it into your mouth without a second thought." ) );
+        } else {
+            overfull = !maybe_query( _( "You will not be able to finish it all.  Consume it?" ) );
+        }
     }
 
     if( overfull ) {
@@ -400,7 +409,6 @@ bool player::eat( item &food, bool force )
     if( !food.is_food() ) {
         return false;
     }
-
     // Check if it's rotten before eating!
     food.calc_rot( global_square_location() );
     const auto edible = can_eat( food, is_player() && !force, force );
@@ -619,6 +627,7 @@ bool player::eat( item &food, bool force )
         vitamin_mod( v.first, qty );
     }
 
+    food.mod_charges( -1 );
     return true;
 }
 
@@ -647,7 +656,7 @@ void cap_nutrition_thirst( player &p, int capacity, bool food, bool water )
 
 void player::consume_effects( item &food, bool rotten )
 {
-    if( !food.is_food() ) {
+    if( !food.is_comestible() ) {
         debugmsg( "called player::consume_effects with non-comestible" );
         return;
     }
@@ -721,32 +730,44 @@ void player::consume_effects( item &food, bool rotten )
     if( addiction_craving( comest->add ) != MORALE_NULL ) {
         rem_morale( addiction_craving( comest->add ) );
     }
+
+    // Morale is in minutes
+    int morale_time = HOURS( 2 ) / MINUTES( 1 );
     if( food.has_flag( "HOT" ) && food.has_flag( "EATEN_HOT" ) ) {
-        add_morale( MORALE_FOOD_HOT, 5, 10 );
+        morale_time = HOURS( 3 ) / MINUTES( 1 );
+        int clamped_nutr = std::max( 5, std::min( 20, nutr / 10 ) );
+        add_morale( MORALE_FOOD_HOT, clamped_nutr, 20, morale_time, morale_time / 2 );
     }
+
     auto fun = comest->fun;
-    if( food.has_flag( "COLD" ) && food.has_flag( "EATEN_COLD" ) && fun > 0 ) {
+    auto fun_max = fun < 0 ? fun * 6 : fun * 3;
+    if( food.has_flag( "EATEN_COLD" ) && food.has_flag( "COLD" ) ) {
         if( fun > 0 ) {
-            add_morale( MORALE_FOOD_GOOD, fun * 3, fun * 3, 60, 30, false, food.type );
+            fun *= 3;
         } else {
             fun = 1;
+            fun_max = 5;
         }
     }
 
     const bool gourmand = has_trait( "GOURMAND" );
-    const bool hibernate = has_active_mutation( "HIBERNATE" );
     if( gourmand ) {
-        if( fun < -2 ) {
-            add_morale( MORALE_FOOD_BAD, fun * 0.5, fun, 60, 30, false, food.type );
+        if( fun < -1 ) {
+            fun_max = fun;
+            fun /= 2;
         } else if( fun > 0 ) {
-            add_morale( MORALE_FOOD_GOOD, fun * 3, fun * 6, 60, 30, false, food.type );
+            fun_max = fun_max * 3 / 2;
+            fun *= 3;
         }
-    } else if( fun < 0 ) {
-        add_morale( MORALE_FOOD_BAD, fun, fun * 6, 60, 30, false, food.type );
-    } else if( fun > 0 ) {
-        add_morale( MORALE_FOOD_GOOD, fun, fun * 4, 60, 30, false, food.type );
     }
 
+    if( fun < 0 ) {
+        add_morale( MORALE_FOOD_BAD, fun, fun_max, morale_time, morale_time / 2, false, food.type );
+    } else if( fun > 0 ) {
+        add_morale( MORALE_FOOD_GOOD, fun, fun_max, morale_time, morale_time / 2, false, food.type );
+    }
+
+    const bool hibernate = has_active_mutation( "HIBERNATE" );
     if( hibernate ) {
         if( ( nutr > 0 && get_hunger() < -60 ) || ( comest->quench > 0 && get_thirst() < -60 ) ) {
             //Tell the player what's going on
@@ -831,7 +852,7 @@ void player::consume_effects( item &food, bool rotten )
 
 hint_rating player::rate_action_eat( const item &it ) const
 {
-    if( !it.is_food_container( this ) && !it.is_food( this ) ) {
+    if( !can_consume( it ) ) {
         return HINT_CANT;
     }
 
@@ -843,4 +864,171 @@ hint_rating player::rate_action_eat( const item &it ) const
     }
 
     return HINT_IFFY;
+}
+
+bool player::can_feed_battery_with( const item &it ) const
+{
+    if( !has_active_bionic( "bio_batteries" ) ) {
+        return false;
+    }
+    return it.is_ammo() && it.type->ammo->type.count( ammotype( "battery" ) );
+}
+
+bool player::feed_battery_with( item &it )
+{
+    if( !can_feed_battery_with( it ) ) {
+        return false;
+    }
+
+    const long amount = std::min( long( max_power_level - power_level ), it.charges );
+
+    if( amount <= 0 ) {
+        add_msg_player_or_npc( m_info, _( "Your internal power storage is fully powered." ),
+                               _( "<npcname>'s internal power storage is fully powered." ) );
+        return false;
+    }
+
+    charge_power( it.charges );
+    it.charges -= amount;
+
+    add_msg_player_or_npc( m_info, _( "You recharge your battery system with the %s." ),
+                           _( "<npcname> recharges their battery system with the %s." ),
+                           it.tname().c_str() );
+    mod_moves( -250 );
+    return true;
+}
+
+bool player::can_feed_reactor_with( const item &it ) const
+{
+    static const std::set<ammotype> acceptable = {{
+            ammotype( "reactor_slurry" ),
+            ammotype( "plutonium" )
+        }
+    };
+
+    if( !it.is_ammo() ) {
+        return false;
+    }
+
+    if( !has_active_bionic( "bio_reactor" ) && !has_active_bionic( "bio_advreactor" ) ) {
+        return false;
+    }
+
+    return std::any_of( acceptable.begin(), acceptable.end(), [ &it ]( const ammotype & elem ) {
+        return it.type->ammo->type.count( elem );
+    } );
+}
+
+bool player::feed_reactor_with( item &it )
+{
+    if( !can_feed_reactor_with( it ) ) {
+        return false;
+    }
+
+    static const std::map<itype_id, int> contained_charges = {
+        { "plut_cell",         PLUTONIUM_CHARGES * 10 },
+        { "plut_slurry_dense", PLUTONIUM_CHARGES },
+        { "plut_slurry",       PLUTONIUM_CHARGES / 2 }
+    };
+
+    const auto iter = contained_charges.find( it.typeId() );
+
+    if( iter == contained_charges.end() ) {
+        return false;
+    }
+
+    const int amount = iter->second;
+    if( amount >= PLUTONIUM_CHARGES * 10 &&
+        !query_yn( _( "Thats a LOT of plutonium.  Are you sure you want that much?" ) ) ) {
+        return false;
+    }
+
+    add_msg_player_or_npc( _( "You add your %s to your reactor's tank." ),
+                           _( "<npcname> pours %s into their reactor's tank." ),
+                           it.tname().c_str() );
+
+    tank_plut += amount; // @todo Encapsulate
+    it.charges -= 1;
+    mod_moves( -250 );
+    return true;
+}
+
+bool player::can_feed_furnace_with( const item &it ) const
+{
+    if( !has_active_bionic( "bio_furnace" ) ) {
+        return false;
+    }
+    return it.flammable() && !it.has_flag( "RADIOACTIVE" ) && it.typeId() != "corpse";
+}
+
+bool player::feed_furnace_with( item &it )
+{
+    if( !can_feed_furnace_with( it ) ) {
+        return false;
+    }
+
+    int amount = ( it.volume() / 250_ml + it.weight() ) / 9;
+    if( it.made_of( material_id( "leather" ) ) ) {
+        amount /= 4;
+    }
+    if( it.made_of( material_id( "wood" ) ) ) {
+        amount /= 2;
+    }
+
+    amount = std::min( max_power_level - power_level, amount );
+
+    if( is_player() ) {
+        if( amount <= 0 ) {
+            if( !query_yn(
+                    _( "Burning this %s in your internal furnace won't give you more energy.  Do it anyway?" ),
+                    it.tname().c_str() ) ) {
+                return false;
+            }
+        } else {
+            if( !query_yn( _( "Burn this %s in your internal furnace (provides %d points of energy)?" ),
+                           it.tname().c_str(), amount ) ) {
+                return false;
+            }
+        }
+    }
+
+    add_msg_player_or_npc( _( "You digest your %s for energy." ),
+                           _( "<npcname> digests a %s. for energy." ), it.tname().c_str() );
+
+    charge_power( amount );
+    it.charges = 0;
+
+    mod_moves( -250 );
+    return true;
+}
+
+bool player::can_consume_as_is( const item &it ) const
+{
+    return it.is_comestible()
+           || can_feed_battery_with( it )
+           || can_feed_reactor_with( it )
+           || can_feed_furnace_with( it );
+}
+
+bool player::can_consume( const item &it ) const
+{
+    if( can_consume_as_is( it ) ) {
+        return true;
+    }
+    // checking NO_UNLOAD to prevent consumption of `battery` when contained in `battery_car` (#20012)
+    return !it.is_container_empty() && !it.has_flag( "NO_UNLOAD" ) &&
+           can_consume_as_is( it.contents.front() );
+}
+
+item &player::get_comestible_from( item &it ) const
+{
+    if( can_consume_as_is( it ) ) {
+        return it;
+    }
+    if( !it.is_container_empty() && can_consume_as_is( it.contents.front() ) ) {
+        return it.contents.front();
+    }
+    static item null_comestible;
+    null_comestible = item();   // Since it's not const.
+    return null_comestible;
 }

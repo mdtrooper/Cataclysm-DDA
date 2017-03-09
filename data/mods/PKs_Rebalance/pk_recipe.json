@@ -3,7 +3,7 @@
     "type" : "recipe",
     "result": "water_clean",
     "id_suffix": "from plant",
-    "byproducts": { "id" : "sac_empty", "amount" : 3 },
+    "byproducts": [ [ "sac_empty", 3 ] ],
     "category": "CC_FOOD",
     "subcategory": "CSC_FOOD_DRINKS",
     "skill_used": "cooking",
@@ -26,7 +26,7 @@
     "type" : "recipe",
     "result": "water",
     "id_suffix": "from plant",
-    "byproducts": { "id" : "sac_empty", "amount" : 3 },
+    "byproducts": [ [ "sac_empty", 3 ] ],
     "category": "CC_FOOD",
     "subcategory": "CSC_FOOD_DRINKS",
     "skill_used": "cooking",
@@ -98,13 +98,10 @@
     ]
     },{
     "result": "broken_mechaspider",
-    "type": "recipe",
-    "category": "CC_NONCRAFT",
-    "subcategory": "CSC_NONCRAFT",
+    "type": "uncraft",
     "skill_used": "survival",
     "difficulty": 2,
     "time": 1200,
-    "reversible": true,
     "qualities": [{"id":"BUTCHER","level":12}],
     "components": [
         [["spider_brain", 1 ]],
@@ -128,13 +125,10 @@
     ]
     },{
     "result": "arachnotron_guts",
-    "type": "recipe",
-    "category": "CC_NONCRAFT",
-    "subcategory": "CSC_NONCRAFT",
+    "type": "uncraft",
     "skill_used": "electronics",
     "difficulty": 8,
     "time": 480000,
-    "reversible": true,
     "qualities": [
         {"id":"SCREW","level":1},
         {"id":"WRENCH","level":1},
@@ -370,7 +364,7 @@
     "result": "bomblet_explosive",
     "note": "crafted explosive bomblets",
     "category": "CC_AMMO",
-    "subcategory": "CSC_AMMO_BULLETS",
+    "subcategory": "CSC_AMMO_OTHER",
     "skill_used": "fabrication",
     "skills_required": [ "gun", 2 ],
     "difficulty": 4,
@@ -393,7 +387,7 @@
     "result": "bomblet_frag",
     "note": "crafted frag bomblets",
     "category": "CC_AMMO",
-    "subcategory": "CSC_AMMO_BULLETS",
+    "subcategory": "CSC_AMMO_OTHER",
     "skill_used": "fabrication",
     "skills_required": [ "gun", 2 ],
     "difficulty": 5,
@@ -416,7 +410,7 @@
     "result": "bomblet_fire",
     "note": "crafted fire bomblets",
     "category": "CC_AMMO",
-    "subcategory": "CSC_AMMO_BULLETS",
+    "subcategory": "CSC_AMMO_OTHER",
     "skill_used": "fabrication",
     "skills_required": [ "gun", 3 ],
     "difficulty": 6,
@@ -440,7 +434,7 @@
     "result": "bomblet_acid",
     "note": "crafted acid bomblets",
     "category": "CC_AMMO",
-    "subcategory": "CSC_AMMO_BULLETS",
+    "subcategory": "CSC_AMMO_OTHER",
     "skill_used": "fabrication",
     "skills_required": [ "gun", 3 ],
     "difficulty": 6,
@@ -463,7 +457,7 @@
     "result": "bomblet_stun",
     "note": "crafted stun bomblets",
     "category": "CC_AMMO",
-    "subcategory": "CSC_AMMO_BULLETS",
+    "subcategory": "CSC_AMMO_OTHER",
     "skill_used": "fabrication",
     "skills_required": [ "gun", 3, "cooking", 5 ],
     "difficulty": 7,
@@ -510,17 +504,12 @@
     },
 
     {
-    "type": "recipe",
+    "type": "uncraft",
     "result": "megaarmor_torso_1",
-    "id_suffix": "uncraft",
-    "category": "CC_NONCRAFT",
-    "subcategory": "CSC_NONCRAFT",
     "skill_used": "fabrication",
     "skills_required": [ "tailor", 7 ],
     "difficulty": 6,
     "time": 132000,
-    "reversible": true,
-    "autolearn": false,
     "qualities": [
         {"id":"CUT","level":1},
         {"id":"SCREW_FINE","level":1},
@@ -534,17 +523,12 @@
         [[ "shoulder_strap", 2 ]]
     ]
     },{
-    "type": "recipe",
+    "type": "uncraft",
     "result": "megaarmor_leggings_1",
-    "id_suffix": "uncraft",
-    "category": "CC_NONCRAFT",
-    "subcategory": "CSC_NONCRAFT",
     "skill_used": "fabrication",
     "skills_required": [ "tailor", 3 ],
     "difficulty": 3,
     "time": 8200,
-    "reversible": true,
-    "autolearn": false,
     "qualities": [
     {"id":"CUT","level":1}
     ],
@@ -553,17 +537,12 @@
         [[ "neoprene", 8 ]]
     ]
     },{
-    "type": "recipe",
+    "type": "uncraft",
     "result": "megaarmor_boots_1",
-    "id_suffix": "uncraft",
-    "category": "CC_NONCRAFT",
-    "subcategory": "CSC_NONCRAFT",
     "skill_used": "fabrication",
     "skills_required": [ "tailor", 4 ],
     "difficulty": 5,
     "time": 23200,
-    "reversible": true,
-    "autolearn": false,
     "qualities": [
         {"id":"CUT","level":1},
         {"id":"SCREW_FINE","level":1},
@@ -576,17 +555,12 @@
         [[ "rag", 2 ]]
     ]
     },{
-    "type": "recipe",
+    "type": "uncraft",
     "result": "megaarmor_gloves_1",
-    "id_suffix": "uncraft",
-    "category": "CC_NONCRAFT",
-    "subcategory": "CSC_NONCRAFT",
     "skill_used": "fabrication",
     "skills_required": [ "tailor", 2 ],
     "difficulty": 3,
     "time": 1000,
-    "reversible": true,
-    "autolearn": false,
     "qualities": [
     {"id":"CUT","level":1}
     ],
@@ -595,17 +569,12 @@
         [[ "leather", 2 ]]
     ]
     },{
-    "type": "recipe",
+    "type": "uncraft",
     "result": "megaarmor_armguards_1",
-    "id_suffix": "uncraft",
-    "category": "CC_NONCRAFT",
-    "subcategory": "CSC_NONCRAFT",
     "skill_used": "fabrication",
     "skills_required": [ "tailor", 2 ],
     "difficulty": 3,
     "time": 5400,
-    "reversible": true,
-    "autolearn": false,
     "qualities": [
     {"id":"CUT","level":1}
     ],
@@ -736,7 +705,7 @@
     },{
     "type": "recipe",
     "result": "megabear_skull_clean",
-    "byproducts": { "id": "fat", "charges_mult": 2 },
+    "byproducts": [ [ "fat", 2 ] ],
     "category": "CC_OTHER",
     "subcategory": "CSC_OTHER_OTHER",
     "skill_used": "survival",

@@ -10,11 +10,9 @@
   "time": 10000,
   "autolearn": true,
   "book_learn": [["textbook_survival", 2], ["mag_survival", 3]],
-  "qualities" : [{"id":"HAMMER","level":1}],
-  "components": [
-    [[ "sharp_rock", 1 ]],
-    [[ "steel_chunk", 1 ]]
-  ]
+  "using": [ [ "forging_standard", 1 ], [ "steel_tiny", 1 ] ],
+  "qualities" : [{"id":"HAMMER","level":3}],
+  "components": [ [[ "sharp_rock", 1 ]] ]
 },
 {
   "type" : "recipe",
@@ -117,10 +115,12 @@
   "difficulty": 2,
   "time": 90000,
   "autolearn": true,
-  "qualities":[{"id":"HAMMER","level":3}],
+  "qualities":[
+    {"id":"HAMMER","level":3},
+    { "id": "CHISEL", "level": 3 }
+  ],
   "tools": [
     [ ["tongs", -1] ],
-    [ ["chisel", -1] ],
     [ ["anvil", -1] ],
     [ ["forge", 100], [ "oxy_torch", 20] ]
   ],
@@ -336,6 +336,7 @@
       [ "plant_fibre", 20 ],
       [ "sinew", 20 ],
       [ "thread", 20 ],
+      [ "yarn", 20 ],
       [ "duct_tape", 20 ]
     ],
     [
@@ -351,7 +352,6 @@
   "category": "CC_OTHER",
   "subcategory": "CSC_OTHER_TOOLS",
   "skill_used": "fabrication",
-  "skills_required": [ "carpentry", 1 ],
   "difficulty": 4,
   "time": 60000,
   "reversible": true,
@@ -470,6 +470,7 @@
       [ "plant_fibre", 20 ],
       [ "sinew", 20 ],
       [ "thread", 20 ],
+      [ "yarn", 20 ],
       [ "duct_tape", 20 ]
     ],
     [
@@ -486,11 +487,8 @@
   "difficulty": 1,
   "time": 45000,
   "autolearn": true,
-  "tools": [
-    [
-      [ "sewing_kit", 40 ]
-    ]
-  ],
+  "using": [ [ "filament", 40 ] ],
+  "qualities": [ { "id": "SEW", "level": 1 } ],
   "components": [
      [
       [ "rag", 1 ],
@@ -556,13 +554,10 @@
   "difficulty": 2,
   "time": 5000,
   "autolearn": true,
+  "using": [ [ "filament", 10 ] ],
   "qualities" : [
-    {"id":"CUT","level":1}
-  ],
-  "tools": [
-    [
-      [ "sewing_kit", 10 ]
-    ]
+    { "id" : "SEW" , "level" : 1 },
+    { "id" : "CUT" , "level" : 1 }
   ],
   "components": [
     [
@@ -614,26 +609,16 @@
   ]
 },{
   "type" : "recipe",
-  "override": true,
   "result": "plant_fibre",
+  "override": true,
   "category": "CC_OTHER",
   "subcategory": "CSC_OTHER_MATERIALS",
   "skill_used": "survival",
   "difficulty": 1,
-  "result_mult": 2,
   "time": 6000,
   "autolearn": true,
-  "tools": [
-    [
-      [ "distaff_spindle", -1 ]
-    ]
-  ],
   "components": [
-    [
-      [ "dogbane", 1 ],
-      [ "cattail_stalk", 1 ],
-      [ "weed", 1 ]
-    ]
+    [ [ "dogbane", 1 ], [ "cattail_stalk", 1 ], [ "weed", 1 ] ]
   ]
 },{
   "type" : "recipe",
@@ -733,10 +718,10 @@
   "time": 80000,
   "autolearn": true,
   "qualities":[
-    {"id":"HAMMER","level":3}
+    {"id":"HAMMER","level":3},
+    { "id": "CHISEL", "level": 3 }
   ], "tools": [
       [ ["tongs", -1] ],
-      [ ["chisel", -1]],
       [ ["anvil", -1] ],
       [ ["forge", 100], [ "oxy_torch", 20] ]
       ],
@@ -872,7 +857,7 @@
   "category": "CC_OTHER",
   "subcategory": "CSC_OTHER_TOOLS",
   "skill_used": "survival",
-  "skills_required": [ "carpentry", 1 ],
+  "skills_required": [ "fabrication", 1 ],
   "difficulty": 2,
   "time": 60000,
   "autolearn": true,
@@ -891,6 +876,7 @@
       [ "sinew", 40 ],
       [ "thread", 40 ],
       [ "plant_fibre", 40 ],
+      [ "yarn", 40 ],
       [ "withered", 2 ]
     ]
   ]
@@ -900,7 +886,7 @@
   "category": "CC_OTHER",
   "subcategory": "CSC_OTHER_TOOLS",
   "skill_used": "survival",
-  "skills_required": [ "carpentry", 1 ],
+  "skills_required": [ "fabrication", 1 ],
   "difficulty": 3,
   "time": 60000,
   "autolearn": true,
@@ -921,6 +907,7 @@
       [ "sinew", 40 ],
       [ "thread", 40 ],
       [ "plant_fibre", 40 ],
+      [ "yarn", 40 ],
       [ "withered", 1 ]
     ]
   ]
@@ -1100,7 +1087,8 @@
       [ "bone_glue", 1 ],
       [ "thread", 20 ],
       [ "sinew", 20 ],
-      [ "plant_fibre", 20 ]
+      [ "plant_fibre", 20 ],
+      [ "yarn", 20 ]
     ],
     [
       [ "bone", 5 ],
@@ -1110,6 +1098,7 @@
     [
       [ "feather", 10 ],
       [ "duct_tape", 40 ],
+      [ "paper", 40 ],
       [ "bag_plastic", 1 ],
       [ "bottle_plastic_small", 1 ],
       [ "box_small", 1 ],
@@ -1164,6 +1153,29 @@
   "components": [
     [ [ "snare_trigger", 1 ] ],
     [ [ "rope_6", 1 ] ]
+  ]
+},{
+  "type" : "recipe",
+  "result": "crossbow_makeshift",
+  "category": "CC_WEAPON",
+  "subcategory": "CSC_WEAPON_RANGED",
+  "skill_used": "fabrication",
+  "skills_required": [[ "survival", 1 ], [ "archery", 2 ]],
+  "difficulty": 2,
+  "time": 15000,
+  "reversible": true,
+  "qualities" : [ {"id":"CUT","level":1} ],
+  "components": [
+    [
+      [ "2x4", 2 ],
+      [ "stick", 4 ]
+    ],
+    [
+      [ "splinter", 1 ]
+    ],
+    [
+      [ "string_36", 3 ]
+    ]
   ]
 }
 ]

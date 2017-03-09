@@ -1,3 +1,4 @@
+#pragma once
 #ifndef GAME_CONSTANTS_H
 #define GAME_CONSTANTS_H
 
@@ -24,8 +25,6 @@
 
 // Really just a sanity check for functions not tested beyond this. in theory 4096 works (`InvletInvlet)
 #define MAX_ITEM_IN_SQUARE 4096
-// 6.25 dead bears is enough for everybody!
-#define MAX_VOLUME_IN_SQUARE 4000
 // no reason to differ
 #define MAX_ITEM_IN_VEHICLE_STORAGE MAX_ITEM_IN_SQUARE
 // only can wear a maximum of two of any type of clothing
@@ -37,6 +36,8 @@
 // All map segments will need to be at least this wide.
 #define SEEX 12
 #define SEEY SEEX
+
+#define MAX_VIEW_DISTANCE ( SEEX * int( MAPSIZE / 2 ) )
 
 // Size of the overmap. This is the number of overmap terrain tiles per dimension in one overmap,
 // it's just like SEEX/SEEY for submaps.
@@ -75,7 +76,7 @@
 #define TOOL_LIFT_FACTOR 500000 // 500kg/level
 
 /** Cap JACK requirements to support arbritrarily large vehicles */
-#define JACK_LIMIT 6000000 // 6000kg (6 metric tonnes)
+#define JACK_LIMIT 8000000 // 8000kg (8 metric tonnes)
 
 /** Maximum density of a map field */
 #define MAX_FIELD_DENSITY 3
@@ -86,11 +87,23 @@
 /** Maximum (effective) level for a skill */
 #define MAX_SKILL 10
 
+/** Maximum (effective) level for a stat */
+#define MAX_STAT 20
+
+/** Maximum range for aimed weapons */
+#define MAX_RANGE 30
+
 /** Accuracy levels which a shots tangent must be below */
 constexpr double accuracy_headshot = 0.1;
 constexpr double accuracy_critical = 0.2;
 constexpr double accuracy_goodhit  = 0.5;
 constexpr double accuracy_standard = 0.8;
 constexpr double accuracy_grazing  = 1.0;
+
+/** Minimum item damage output of relevant type to allow using with relevant weapon skill */
+#define MELEE_STAT 5
+
+/** Effective lower bound to combat skill levels when CQB bionic is active */
+#define BIO_CQB_LEVEL 5
 
 #endif

@@ -66,7 +66,6 @@
     "skill": "pistol",
     "range": 20,
     "ranged_damage": 60,
-    "recoil": 30,
     "durability": 6,
     "loudness": 150,
     "clip_size": 1,
@@ -120,10 +119,7 @@
     "durability": 8,
     "ups_charges": 249,
     "valid_mod_locations": [],
-    "ammo_effects": [
-      "LASER",
-      "WIDE"
-    ],
+    "ammo_effects": [ "LASER", "WIDE" ],
     "flags": [ "NEVER_JAMS", "NO_UNLOAD", "MOUNTED_GUN" ]
   },
   {
@@ -148,10 +144,7 @@
     "burst": 5,
     "ups_charges": 29,
     "valid_mod_locations": [],
-    "ammo_effects": [
-      "LASER",
-      "WIDE"
-    ],
+    "ammo_effects": [ "LASER", "WIDE" ],
     "flags": [ "NEVER_JAMS", "NO_UNLOAD", "MOUNTED_GUN" ]
   },
   {
@@ -175,11 +168,7 @@
     "durability": 8,
     "ups_charges": 499,
     "valid_mod_locations": [],
-    "ammo_effects": [
-      "EXPLOSIVE",
-      "LASER",
-      "WIDE"
-    ],
+    "ammo_effects": [ "EXPLOSIVE", "LASER", "WIDE" ],
     "flags": [ "NEVER_JAMS", "NO_UNLOAD", "MOUNTED_GUN" ]
   },
   {
@@ -235,35 +224,6 @@
     "flags": [ "MOUNTED_GUN", "NEVER_JAMS" ]
   },
   {
-    "id": "nx17p",
-    "type": "GUN",
-    "name": "NX-17 pulse rifle",
-    "//": "Turrets use volume as a measure of dispersion and recoil doesn't affect vehicles; so for the moment, I left those as zero.  This will change as soon as these issues are addressed.",
-    "description": "A powerful energy rifle, the addition of a capacitor allows the weapon to fire in controlled bursts.  The increased power requirements require a significant power source and the firing mechanism also requires a specialized chassis.",
-    "weight": 5194,
-    "volume": 15,
-    "price": 1500000,
-    "to_hit": -1,
-    "bashing": 8,
-    "material": [ "steel", "plastic" ],
-    "symbol": "(",
-    "color": "blue",
-    "skill": "rifle",
-    "range": 20,
-    "ranged_damage": 20,
-    "pierce": 10,
-    "sight_dispersion": 150,
-    "durability": 8,
-    "burst": 3,
-    "ups_charges": 19,
-    "valid_mod_locations": [],
-    "ammo_effects": [
-      "INCENDIARY",
-      "WIDE"
-    ],
-    "flags": [ "NEVER_JAMS", "NO_UNLOAD", "MOUNTED_GUN" ]
-  },
-  {
     "id": "railturret",
     "type": "GUN",
     "name": "hypervelocity driver",
@@ -287,11 +247,7 @@
     "ups_charges": 249,
     "reload": 200,
     "valid_mod_locations": [],
-    "ammo_effects": [
-      "FRAG",
-      "TRAIL",
-      "WIDE"
-    ]
+    "ammo_effects": [ "FRAG", "TRAIL", "WIDE" ]
   },
   {
     "id": "ripper",
@@ -388,7 +344,7 @@
     "skill": "rifle",
     "range": 8,
     "ranged_damage": 20,
-    "dispersion": 1500,
+    "dispersion": 1300,
     "sight_dispersion": 150,
     "durability": 5,
     "burst": 25,
@@ -445,11 +401,7 @@
     "durability": 8,
     "ups_charges": 249,
     "valid_mod_locations": [],
-    "ammo_effects": [
-      "BOUNCE",
-      "LIGHTNING",
-      "MOUNTED_GUN"
-    ],
+    "ammo_effects": [ "BOUNCE", "LIGHTNING", "MOUNTED_GUN" ],
     "flags": [ "NEVER_JAMS", "NO_UNLOAD" ]
   },
   {

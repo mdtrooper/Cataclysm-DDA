@@ -203,7 +203,7 @@
             ]
         },
         "max_volume": 4000,
-        "flags": ["TRANSPARENT", "CONTAINER", "FLAMMABLE_ASH",
+        "flags": ["TRANSPARENT", "FLAMMABLE_ASH",
                   "PLACE_ITEM", "ORGANIC", "MOUNTABLE"],
         "bash": {
             "str_min": 12, "str_max": 40,
@@ -588,7 +588,8 @@
             "items": [
                 { "item": "pipe", "count": 1 },
                 { "item": "steel_chunk", "count": 1 },
-                { "item": "scrap", "count": [2, 6] }
+                { "item": "scrap", "count": [2, 6] },
+                { "item": "lead", "charges": [1000, 2000] }
             ]
         },
         "bash": {
@@ -598,7 +599,8 @@
             "items": [
                 { "item": "scrap", "count": [2, 6] },
                 { "item": "steel_chunk", "prob": 50 },
-                { "item": "pipe", "count": 1 }
+                { "item": "pipe", "count": 1 },
+                { "item": "lead", "charges": [1000, 2000] }
             ]
         }
     },{
@@ -1048,7 +1050,7 @@
         "flags": ["SEALED", "PLACE_ITEM", "ALARMED", "CONTAINER", "BLOCKSDOOR"],
         "examine_action": "vending",
         "bash": {
-            "str_min": 6, "str_max": 20,
+            "str_min": 20, "str_max": 40,
             "sound": "glass breaking!",
             "sound_fail": "whack!",
             "sound_vol": 16,
@@ -1068,7 +1070,7 @@
         "required_str": 10,
         "flags": ["PLACE_ITEM", "CONTAINER", "BLOCKSDOOR"],
         "bash": {
-            "str_min": 18, "str_max": 50,
+            "str_min": 30, "str_max": 50,
             "sound": "metal screeching!",
             "sound_fail": "clang!",
             "items": [
@@ -1658,7 +1660,7 @@
         "color": "brown",
         "move_cost_mod": 0,
         "required_str": -1,
-        "flags": ["PLANT", "SEALED", "TRANSPARENT", "CONTAINER", "NOITEM", "TINY"],
+        "flags": ["PLANT", "SEALED", "TRANSPARENT", "CONTAINER", "NOITEM", "TINY", "DONT_REMOVE_ROTTEN"],
         "examine_action": "aggie_plant"
     },{
         "type" : "furniture",
@@ -1668,7 +1670,7 @@
         "color": "green",
         "move_cost_mod": 0,
         "required_str": -1,
-        "flags": ["PLANT", "SEALED", "TRANSPARENT", "CONTAINER", "NOITEM", "TINY"],
+        "flags": ["PLANT", "SEALED", "TRANSPARENT", "CONTAINER", "NOITEM", "TINY", "DONT_REMOVE_ROTTEN"],
         "examine_action": "aggie_plant",
         "bash": {
             "str_min": 2, "str_max": 6,
@@ -1683,7 +1685,7 @@
         "color": "green",
         "move_cost_mod": 0,
         "required_str": -1,
-        "flags": ["PLANT", "SEALED", "TRANSPARENT", "CONTAINER", "NOITEM", "TINY"],
+        "flags": ["PLANT", "SEALED", "TRANSPARENT", "CONTAINER", "NOITEM", "TINY", "DONT_REMOVE_ROTTEN"],
         "examine_action": "aggie_plant",
         "bash": {
             "str_min": 3, "str_max": 8,
@@ -1698,7 +1700,7 @@
         "color": "ltgreen",
         "move_cost_mod": 0,
         "required_str": -1,
-        "flags": ["PLANT", "SEALED", "TRANSPARENT", "CONTAINER", "NOITEM", "TINY"],
+        "flags": ["PLANT", "SEALED", "TRANSPARENT", "CONTAINER", "NOITEM", "TINY", "DONT_REMOVE_ROTTEN"],
         "examine_action": "aggie_plant",
         "bash": {
             "str_min": 4, "str_max": 10,
@@ -1713,7 +1715,7 @@
         "color": "brown",
         "move_cost_mod": -1,
         "required_str": -1,
-        "flags": ["NOITEM", "SEALED", "TRANSPARENT", "FLAMMABLE", "CONTAINER"],
+        "flags": ["NOITEM", "SEALED", "TRANSPARENT", "FLAMMABLE", "CONTAINER", "DONT_REMOVE_ROTTEN"],
         "examine_action": "fvat_empty",
         "bash": {
             "str_min": 3, "str_max": 45,
@@ -1734,7 +1736,7 @@
         "color": "brown_cyan",
         "move_cost_mod": -1,
         "required_str": -1,
-        "flags": ["NOITEM", "SEALED", "TRANSPARENT", "FLAMMABLE", "CONTAINER"],
+        "flags": ["NOITEM", "SEALED", "TRANSPARENT", "FLAMMABLE", "CONTAINER", "DONT_REMOVE_ROTTEN"],
         "examine_action": "fvat_full",
         "bash": {
             "str_min": 12, "str_max": 50,
@@ -1863,7 +1865,10 @@
         "move_cost_mod": 1,
         "required_str": -1,
         "flags": ["TRANSPARENT", "TINY", "FLAMMABLE_ASH"],
-        "examine_action": "flower_datura",
+        "examine_action": "harvest_furn_nectar",
+        "harvest_by_season" : [
+            { "seasons": [ "spring", "summer", "autumn" ], "entries": [ { "drop": "datura_seed", "base_num": [ 2, 6 ] } ] }
+        ],
         "bash": {
             "str_min": 2, "str_max": 6,
             "sound": "crunch.",
@@ -1893,7 +1898,10 @@
         "move_cost_mod": 0,
         "required_str": -1,
         "flags": ["TRANSPARENT", "TINY", "FLAMMABLE_ASH"],
-        "examine_action": "flower_dandelion",
+        "examine_action": "harvest_furn_nectar",
+        "harvest_by_season" : [
+            { "seasons": [ "spring", "summer", "autumn" ], "entries": [ { "drop": "raw_dandelion", "base_num": [ 1, 4 ] } ] }
+        ],
         "bash": {
             "str_min": 2, "str_max": 6,
             "sound": "crunch.",
@@ -1922,7 +1930,11 @@
         "move_cost_mod": 1,
         "required_str": -1,
         "flags": ["TRANSPARENT", "TINY", "FLAMMABLE_ASH"],
-        "examine_action": "examine_cattails",
+        "examine_action": "harvest_furn",
+        "harvest_by_season" : [
+            { "seasons": [ "winter" ], "entries": [ { "drop": "cattail_rhizome" } ] },
+            { "seasons": [ "spring", "summer", "autumn" ], "entries": [ { "drop": "cattail_rhizome" }, { "drop": "cattail_stalk", "base_num": [ 1, 4 ] } ] }
+        ],
         "bash": {
             "str_min": 2, "str_max": 6,
             "sound": "crunch.",
@@ -2605,7 +2617,7 @@
         "color": "dkgray",
         "move_cost_mod": 3,
         "required_str": 10,
-        "flags": ["TRANSPARENT", "MINEABLE", "UNSTABLE", "TINY"],
+        "flags": ["TRANSPARENT", "MINEABLE", "UNSTABLE", "MOUNTABLE", "TINY"],
         "bash": {
             "str_min": 16, "str_max": 40,
             "sound": "smash!",
@@ -2622,7 +2634,7 @@
         "color": "dkgray",
         "move_cost_mod": 6,
         "required_str": 16,
-        "flags": ["NOITEM", "TRANSPARENT", "MINEABLE", "UNSTABLE", "SHORT", "BASHABLE"],
+        "flags": ["NOITEM", "TRANSPARENT", "MINEABLE", "UNSTABLE", "MOUNTABLE", "SHORT", "BASHABLE"],
         "bash": {
             "str_min": 32, "str_max": 80,
             "sound": "smash!",

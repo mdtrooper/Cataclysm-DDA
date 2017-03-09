@@ -1,3 +1,4 @@
+#pragma once
 #ifndef OPTIONS_H
 #define OPTIONS_H
 
@@ -81,6 +82,7 @@ class options_manager : public JsonSerializer, public JsonDeserializer
                 //set value
                 void setValue( std::string sSetIn );
                 void setValue( float fSetIn );
+                void setValue( int iSetIn );
 
                 template<typename T>
                 T value_as() const;
@@ -96,6 +98,8 @@ class options_manager : public JsonSerializer, public JsonDeserializer
                 std::string sMenuText;
                 std::string sTooltip;
                 std::string sType;
+
+                std::string format;
 
                 copt_hide_t hide;
                 int iSortPos;
@@ -144,6 +148,9 @@ class options_manager : public JsonSerializer, public JsonDeserializer
          */
         std::unordered_map<std::string, cOpt> get_world_defaults() const;
 
+        /** Check if an option exists? */
+        bool has_option( const std::string &name ) const;
+
         cOpt &get_option( const std::string &name );
         cOpt &get_world_option( const std::string &name );
 
@@ -168,7 +175,8 @@ class options_manager : public JsonSerializer, public JsonDeserializer
         void add( const std::string sNameIn, const std::string sPageIn,
                   const std::string sMenuTextIn, const std::string sTooltipIn,
                   const int iMinIn, int iMaxIn, int iDefaultIn,
-                  copt_hide_t opt_hide = COPT_NO_HIDE );
+                  copt_hide_t opt_hide = COPT_NO_HIDE,
+                  const std::string &format = "%i" );
 
         //add int map option
         void add( const std::string sNameIn, const std::string sPageIn,
@@ -181,7 +189,8 @@ class options_manager : public JsonSerializer, public JsonDeserializer
                   const std::string sMenuTextIn, const std::string sTooltipIn,
                   const float fMinIn, float fMaxIn,
                   float fDefaultIn, float fStepIn,
-                  copt_hide_t opt_hide = COPT_NO_HIDE );
+                  copt_hide_t opt_hide = COPT_NO_HIDE,
+                  const std::string &format = "%.2f" );
 
     private:
         std::unordered_map<std::string, cOpt> global_options;

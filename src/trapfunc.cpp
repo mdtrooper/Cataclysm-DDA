@@ -31,16 +31,17 @@ const efftype_id effect_tetanus( "tetanus" );
 // A pit becomes less effective as it fills with corpses.
 float pit_effectiveness( const tripoint &p )
 {
-    int corpse_volume = 0;
+    units::volume corpse_volume = 0;
     for( auto &pit_content : g->m.i_at( p ) ) {
         if( pit_content.is_corpse() ) {
             corpse_volume += pit_content.volume();
         }
     }
 
-    int filled_volume = 75 * 10; // 10 zombies; see item::volume
+    // 10 zombies; see item::volume
+    const units::volume filled_volume = 10 * units::from_milliliter<float>( 62500 );
 
-    return std::max( 0.0f, 1.0f - float( corpse_volume ) / filled_volume );
+    return std::max( 0.0f, 1.0f - corpse_volume / filled_volume );
 }
 
 void trapfunc::bubble( Creature *c, const tripoint &p )
@@ -208,7 +209,7 @@ void trapfunc::tripwire( Creature *c, const tripoint &p )
                 n->hurtall( rng( 1, 4 ), nullptr );
             }
             if( c == &g->u ) {
-                g->update_map( &g->u );
+                g->update_map( g->u );
             }
         }
         c->check_dead_state();
@@ -394,7 +395,7 @@ void trapfunc::shotgun( Creature *c, const tripoint &p )
     }
     if( shots == 2 || g->m.tr_at( p ).loadid == tr_shotgun_1 ) {
         g->m.remove_trap( p );
-        g->m.spawn_item( p, "shotgun_sawn" );
+        g->m.spawn_item( p, "shotgun_s" );
         g->m.spawn_item( p, "string_6" );
     } else {
         g->m.add_trap( p, tr_shotgun_1 );
@@ -931,7 +932,7 @@ static bool sinkhole_safety_roll( player *p, const std::string &itemname, const 
                                   _( "<npcname> steps on a sinkhole, but manages to pull themselves to safety." ) );
         p->setpos( random_entry( safe ) );
         if( p == &g->u ) {
-            g->update_map( p );
+            g->update_map( *p );
         }
 
         return true;

@@ -2,6 +2,7 @@
 #include "monster.h"
 #include "game.h"
 #include "map.h"
+#include "fungal_effects.h"
 #include "map_iterator.h"
 #include "rng.h"
 #include "line.h"
@@ -80,6 +81,7 @@ void mdeath::normal(monster *z)
     const std::vector<material_id> gib_mats = {{
         material_id( "flesh" ), material_id( "hflesh" ),
         material_id( "veggy" ), material_id( "iflesh" ),
+        material_id( "bone" )
     }};
     const bool gibbable = !z->type->has_flag( MF_NOGIB ) &&
         std::any_of( gib_mats.begin(), gib_mats.end(), [&z]( const material_id &gm ) {
@@ -291,13 +293,14 @@ void mdeath::fungus(monster *z)
     //~ the sound of a fungus dying
     sounds::sound(z->pos(), 10, _("Pouf!"));
 
+    fungal_effects fe( *g, g->m );
     for( auto &&sporep : g->m.points_in_radius( z->pos(), 1 ) ) {
         if( g->m.impassable( sporep ) ) {
             continue;
         }
         // z is dead, don't credit it with the kill
         // Maybe credit z's killer?
-        g->m.fungalize( sporep, nullptr, 0.25 );
+        fe.fungalize( sporep, nullptr, 0.25 );
     }
 }
 
@@ -428,10 +431,7 @@ void mdeath::blobsplit(monster *z)
     std::vector <tripoint> valid;
 
     for( auto &&dest : g->m.points_in_radius( z->pos(), 1 ) ) {
-        bool moveOK = g->m.passable( dest );
-        bool monOK = g->mon_at( dest ) == -1;
-        bool posOK = (g->u.pos() != dest);
-        if (moveOK && monOK && posOK) {
+        if( g->is_empty( dest ) && z->can_move_to( dest ) ) {
             valid.push_back( dest );
         }
     }
@@ -615,21 +615,24 @@ void mdeath::smokeburst(monster *z)
     g->m.emit_field( z->pos(), emit_id( "emit_smoke_blast" ) );
 }
 
-void mdeath::jabberwock(monster *z)
+void mdeath::jabberwock( monster *z )
 {
     player *ch = dynamic_cast<player*>( z->get_killer() );
-    if( ch != nullptr && ch->is_player() && rl_dist( z->pos(), g->u.pos() ) <= 1  &&
-         ch->weapon.has_flag("VORPAL")) {
-        static const matec_id VORPAL( "VORPAL" );
-        if (!ch->weapon.has_technique( VORPAL )) {
-            if (g->u.sees(*z)) {
-                //~ %s is the possessive form of the monster's name
-                add_msg(m_info, _("As the flames in %s eyes die out, your weapon seems to shine slightly brighter."),
-                        z->disp_name(true).c_str());
-            }
-            ch->weapon.add_technique( VORPAL );
+
+    bool vorpal = ch && ch->is_player() &&
+                  rl_dist( z->pos(), ch->pos() ) <= 1 &&
+                  ch->weapon.has_flag( "DIAMOND" ) &&
+                  ch->weapon.volume() > units::from_milliliter( 750 );
+
+    if( vorpal && !ch->weapon.has_technique( matec_id( "VORPAL" ) ) ) {
+        if( ch->sees( *z ) ) {
+            //~ %s is the possessive form of the monster's name
+            ch->add_msg_if_player( m_info, _( "As the flames in %s eyes die out, your weapon seems to shine slightly brighter." ),
+                                   z->disp_name( true ).c_str() );
         }
+        ch->weapon.add_technique( matec_id( "VORPAL" ) );
     }
+
     mdeath::normal(z);
 }
 

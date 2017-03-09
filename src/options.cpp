@@ -11,6 +11,8 @@
 #include "input.h"
 #include "worldfactory.h"
 #include "catacharset.h"
+#include "game_constants.h"
+#include "string_input_popup.h"
 
 #ifdef TILES
 #include "cata_tiles.h"
@@ -193,7 +195,7 @@ void options_manager::add(const std::string sNameIn, const std::string sPageIn,
 void options_manager::add(const std::string sNameIn, const std::string sPageIn,
                             const std::string sMenuTextIn, const std::string sTooltipIn,
                             const int iMinIn, int iMaxIn, int iDefaultIn,
-                            copt_hide_t opt_hide)
+                            copt_hide_t opt_hide, const std::string &format )
 {
     cOpt thisOpt;
 
@@ -202,6 +204,8 @@ void options_manager::add(const std::string sNameIn, const std::string sPageIn,
     thisOpt.sMenuText = sMenuTextIn;
     thisOpt.sTooltip = sTooltipIn;
     thisOpt.sType = "int";
+
+    thisOpt.format = format;
 
     thisOpt.hide = opt_hide;
 
@@ -264,7 +268,7 @@ void options_manager::add(const std::string sNameIn, const std::string sPageIn,
 void options_manager::add(const std::string sNameIn, const std::string sPageIn,
                             const std::string sMenuTextIn, const std::string sTooltipIn,
                             const float fMinIn, float fMaxIn, float fDefaultIn,
-                            float fStepIn, copt_hide_t opt_hide)
+                            float fStepIn, copt_hide_t opt_hide, const std::string &format )
 {
     cOpt thisOpt;
 
@@ -273,6 +277,8 @@ void options_manager::add(const std::string sNameIn, const std::string sPageIn,
     thisOpt.sMenuText = sMenuTextIn;
     thisOpt.sTooltip = sTooltipIn;
     thisOpt.sType = "float";
+
+    thisOpt.format = format;
 
     thisOpt.hide = opt_hide;
 
@@ -409,16 +415,14 @@ std::string options_manager::cOpt::getValue() const
         return (bSet) ? "true" : "false";
 
     } else if (sType == "int" || sType == "int_map") {
-        std::stringstream ssTemp;
-        ssTemp << iSet;
-        return ssTemp.str();
+        return string_format( format, iSet );
 
     } else if (sType == "float") {
-        std::stringstream ssTemp;
-        ssTemp.imbue(std::locale::classic());
-        const int precision = (fStep >= 0.09) ? 1 : (fStep >= 0.009) ? 2 : (fStep >= 0.0009) ? 3 : 4;
-        ssTemp.precision(precision);
-        ssTemp << std::fixed << fSet;
+        std::ostringstream ssTemp;
+        ssTemp.imbue( std::locale::classic() );
+        ssTemp.precision( 2 );
+        ssTemp.setf( std::ios::fixed, std::ios::floatfield );
+        ssTemp << fSet;
         return ssTemp.str();
     }
 
@@ -540,9 +544,11 @@ void options_manager::cOpt::setNext()
 
     } else if (sType == "string_input") {
         int iMenuTextLength = sMenuText.length();
-        sSet = string_input_popup("", (iMaxLength > 80) ? 80 : ((iMaxLength < iMenuTextLength) ? iMenuTextLength : iMaxLength+1),
-                                  sSet, sMenuText, "", iMaxLength
-                                 );
+        string_input_popup()
+        .width( ( iMaxLength > 80 ) ? 80 : ( ( iMaxLength < iMenuTextLength ) ? iMenuTextLength : iMaxLength + 1) )
+        .description( sMenuText )
+        .max_length( iMaxLength )
+        .edit( sSet );
 
     } else if (sType == "bool") {
         bSet = !bSet;
@@ -620,6 +626,19 @@ void options_manager::cOpt::setValue(float fSetIn)
     fSet = fSetIn;
     if ( fSet < fMin || fSet > fMax ) {
         fSet = fDefault;
+    }
+}
+
+//set value
+void options_manager::cOpt::setValue( int iSetIn )
+{
+    if( sType != "int" ) {
+        debugmsg( "tried to set an int value to a %s option", sType.c_str() );
+        return;
+    }
+    iSet = iSetIn;
+    if( iSet < iMin || iSet > iMax ) {
+        iSet = iDefault;
     }
 }
 
@@ -799,8 +818,8 @@ void options_manager::init()
         0, 20, 0
         );
 
-    add("AUTO_PICKUP_SAFEMODE", "general", _("Auto pickup safemode"),
-        _("Auto pickup is disabled as long as you can see monsters nearby. This is affected by 'Safemode proximity distance'."),
+    add("AUTO_PICKUP_SAFEMODE", "general", _("Auto pickup safe mode"),
+        _("Auto pickup is disabled as long as you can see monsters nearby. This is affected by 'Safe Mode proximity distance'."),
         false
         );
 
@@ -813,35 +832,35 @@ void options_manager::init()
 
     mOptionsSort["general"]++;
 
-    add("AUTOSAFEMODE", "general", _("Auto-safemode"),
-        _("If true, turns safemode automatically back on after it being disabled beforehand. See option 'Turns to re-enable safemode'"),
+    add("AUTOSAFEMODE", "general", _("Auto-safe mode"),
+        _("If true, turns safemode automatically back on after it being disabled beforehand. See option 'Turns to re-enable safe mode'"),
         false
         );
 
-    add("AUTOSAFEMODETURNS", "general", _("Turns to re-enable safemode"),
-        _("Number of turns after safemode is re-enabled if no hostiles are in 'Safemode proximity distance'."),
+    add("AUTOSAFEMODETURNS", "general", _("Turns to re-enable safe mode"),
+        _("Number of turns after safe mode is re-enabled if no hostiles are in 'Safe Mode proximity distance'."),
         1, 100, 50
         );
 
-    add("SAFEMODE", "general", _("Safemode"),
+    add("SAFEMODE", "general", _("Safe Mode"),
         _("If true, will hold the game and display a warning if a hostile monster/npc is approaching."),
         true
         );
 
-    add("SAFEMODEPROXIMITY", "general", _("Safemode proximity distance"),
-        _("If safemode is enabled, distance to hostiles at which safemode should show a warning. 0 = Max player viewdistance."),
-        0, 50, 0
+    add("SAFEMODEPROXIMITY", "general", _("Safe Mode proximity distance"),
+        _("If safe mode is enabled, distance to hostiles at which safe mode should show a warning. 0 = Max player viewdistance."),
+        0, MAX_VIEW_DISTANCE, 0
         );
 
-    add("SAFEMODEVEH", "general", _("Safemode when driving"),
-        _("When true, safemode will alert you of hostiles while you are driving a vehicle."),
+    add("SAFEMODEVEH", "general", _("Safe Mode when driving"),
+        _("When true, safe mode will alert you of hostiles while you are driving a vehicle."),
         false
         );
 
     mOptionsSort["general"]++;
 
     add("TURN_DURATION", "general", _("Realtime turn progression"),
-        _("If enabled, monsters will take periodic gameplay turns. This value is the delay between each turn, in seconds. Works best with Safemode disabled. 0 = disabled."),
+        _("If enabled, monsters will take periodic gameplay turns. This value is the delay between each turn, in seconds. Works best with Safe Mode disabled. 0 = disabled."),
         0.0, 10.0, 0.0, 0.05
         );
 
@@ -927,7 +946,7 @@ void options_manager::init()
     optionNames["ru"] = R"(Русский)";
     optionNames["zh_CN"] = R"(中文(天朝))";
     optionNames["zh_TW"] = R"(中文(台灣))";
-    add("USE_LANG", "interface", _("Language"), _("Switch Language. Requires restart."),
+    add("USE_LANG", "interface", _("Language"), _("Switch Language."),
         ",en,fr,de,it_IT,es_AR,es_ES,ja,ko,pt_BR,pt_PT,ru,zh_CN,zh_TW",
         ""
         );
@@ -953,6 +972,14 @@ void options_manager::init()
     add("USE_METRIC_WEIGHTS", "interface", _("Mass units"),
         _("Switch between kg and lbs."),
         "lbs,kg", "lbs"
+        );
+
+    optionNames["c"] = _("Cup");
+    optionNames["l"] = _("Liter");
+    optionNames["qt"] = _("Quart");
+    add("VOLUME_UNITS", "interface", _("Volume units"),
+        _("Switch between the Cup (c), Liter (L) or Quart (qt)."),
+        "c,l,qt", "l"
         );
 
     //~ 12h time, e.g. 11:59pm
@@ -996,6 +1023,11 @@ void options_manager::init()
     add("CLOSE_ADV_INV", "interface", _("Close advanced inventory on move all"),
         _("If true, will close the advanced inventory when the move all items command is used."),
         false
+        );
+
+    add( "INV_USE_ACTION_NAMES", "interface", _( "Display actions in Use Item menu" ),
+        _( "If true, actions (like \"Read\", \"Smoke\", \"Wrap tighter\") will be displayed next to the corresponding items." ),
+        true
         );
 
     mOptionsSort["interface"]++;
@@ -1044,6 +1076,14 @@ void options_manager::init()
     add("MESSAGE_TTL", "interface", _("Sidebar log message display duration"),
         _("Number of turns after which a message will be removed from the sidebar log. '0' disables this option."),
         0, 1000, 0
+        );
+
+    //~ aim bar style - bars or numbers
+    optionNames["numbers"] = _("Numbers");
+    optionNames["bars"] = _("Bars");
+    add("ACCURACY_DISPLAY", "interface", _("Aim window display style"),
+        _("How should confidence and steadiness be communicated to the player."),
+        "numbers,bars", "bars"
         );
 
     mOptionsSort["interface"]++;
@@ -1118,6 +1158,11 @@ void options_manager::init()
     add("ANIMATION_DELAY", "graphics", _("Animation delay"),
         _("The amount of time to pause between animation frames in ms."),
         0, 100, 10
+        );
+
+    add("FORCE_REDRAW", "graphics", _("Force redraw"),
+        _("If true, forces the game to redraw at least once per turn."),
+        true
         );
 
     mOptionsSort["graphics"]++;
@@ -1253,7 +1298,37 @@ void options_manager::init()
         false
         );
 
+    add("ENCODING_CONV", "debug", _("Experimental path name encoding conversion"),
+        _("If true, file path names are going to be transcoded from system encoding to UTF-8 when reading and will be transcoded back when writing. Mainly for CJK Windows users."),
+        false
+        );
+    
+    mOptionsSort["debug"]++;
+    
+    add("OVERMAP_GENERATION_TRIES", "debug", _("Overmap generation attempt count"),
+        _("Maximum number of retries in overmap generation due to inability to place mandatory special locations. High numbers and strange world settings will lead to VERY slow generation!"),
+        1, 20, 2
+        );
+
+    //~ allow invalid (bugged, bad) maps without asking user
+    optionNames["allow_invalid"] = _("Any");
+    //~ allow any valid map, even if it's "bad"
+    optionNames["ask_invalid"] = _("Valid");
+    //~ ask for lifting restrictions
+    optionNames["ask_unlimited"] = _("Ask");
+    add("ALLOW_INVALID_OVERMAPS", "debug", _("Allow invalid overmaps"),
+        _("What to do if world settings/mods prevent valid overmaps. Invalid maps are BUGGED and while playable, may cause errors during missions. Unlimited maps will look ugly, but are fully functional."),
+        "allow_invalid,ask_invalid,ask_unlimited", "ask_invalid"
+        );
+
     ////////////////////////////WORLD DEFAULT////////////////////
+    add("CORE_VERSION", "world_default", _("Core version data"),
+        _("Controls what migrations are applied for legacy worlds"),
+        1, core_version, core_version, COPT_ALWAYS_HIDE
+        );
+
+    mOptionsSort["world_default"]++;
+
     optionNames["no"] = _("No");
     optionNames["yes"] = _("Yes");
     optionNames["query"] = _("Query");
@@ -1296,6 +1371,18 @@ void options_manager::init()
 
     mOptionsSort["world_default"]++;
 
+    add("MONSTER_SPEED", "world_default", _("Monster speed"),
+        _("Determines the movement rate of monsters. A higher value increases monster speed and a lower reduces it."),
+        1, 1000, 100, COPT_NO_HIDE, "%i%%"
+        );
+
+    add("MONSTER_RESILIENCE", "world_default", _("Monster resilience"),
+        _("Determines how much damage monsters can take. A higher value makes monsters more resilient and a lower makes them more flimsy."),
+        1, 1000, 100, COPT_NO_HIDE, "%i%%"
+        );
+
+    mOptionsSort["world_default"]++;
+
     std::string region_ids("default");
     optionNames["default"] = "default";
     add("DEFAULT_REGION", "world_default", _("Default region type"),
@@ -1325,7 +1412,7 @@ void options_manager::init()
         );
 
     add("CONSTRUCTION_SCALING", "world_default", _("Construction scaling"),
-        _("Multiplies the speed of construction by the given percentage. '0' automatically scales construction to match the world's season length."),
+        _("Sets the time of construction in percents. '50' is two times faster than default, '200' is two times longer. '0' automatically scales construction time to match the world's season length."),
         0, 1000, 100
         );
 
@@ -1335,11 +1422,6 @@ void options_manager::init()
         );
 
     mOptionsSort["world_default"]++;
-
-    add("STATIC_SPAWN", "world_default", _("Static spawn"),
-        _("Spawn zombies at game start instead of during game. Must reset world directory after changing for it to take effect."),
-        true
-        );
 
     add("WANDER_SPAWNS", "world_default", _("Wander spawns"),
         _("Emulation of zombie hordes. Zombie spawn points wander around cities and may go to noise. Must reset world directory after changing for it to take effect."),
@@ -1405,8 +1487,8 @@ void options_manager::init()
 
     mOptionsSort["world_default"]++;
 
-    add("BLACKLIST_MAGAZINES", "world_default", _("Disables removable gun magaziones."),
-        _("If true, disables removeable gun magazines, guns will all act as if they have integral magazines."),
+    add("FILTHY_WOUNDS", "world_default", _("Infected wounds from filthy clothing."),
+        _("If true, getting hit in a body part covered in filthy clothing may cause infections."),
         false, COPT_ALWAYS_HIDE
         );
 
@@ -1414,6 +1496,13 @@ void options_manager::init()
 
     add("NO_VITAMINS", "world_default", _("Disables tracking vitamins in food items."),
         _("If true, disables vitamin tracking and vitamin disorders."),
+        false, COPT_ALWAYS_HIDE
+        );
+
+    mOptionsSort["world_default"]++;
+
+    add("NO_NPC_FOOD", "world_default", _("Disables tracking food, thirst and (partially) fatigue for NPCs."),
+        _("If true, NPCs won't need to eat or drink and will only get tired enough to sleep, not to get penalties."),
         false, COPT_ALWAYS_HIDE
         );
 
@@ -1740,8 +1829,12 @@ void options_manager::show(bool ingame)
                 const bool is_int = cur_opt.getType() == "int";
                 const bool is_float = cur_opt.getType() == "float";
                 const std::string old_opt_val = cur_opt.getValueName();
-                const std::string opt_val = string_input_popup(
-                                                cur_opt.getMenuText(), 80, old_opt_val, "", "", -1, is_int);
+                const std::string opt_val = string_input_popup()
+                                            .title( cur_opt.getMenuText() )
+                                            .width( 80 )
+                                            .text( old_opt_val )
+                                            .only_digits( is_int )
+                                            .query();
                 if (!opt_val.empty() && opt_val != old_opt_val) {
                     if (is_float) {
                         std::istringstream ssTemp(opt_val);
@@ -1822,10 +1915,7 @@ void options_manager::show(bool ingame)
         }
     }
     if( lang_changed ) {
-        set_language(false);
-        g->mmenu_refresh_title();
-        g->mmenu_refresh_motd();
-        g->mmenu_refresh_credits();
+        set_language();
     }
 
     refresh_tiles( used_tiles_changed, pixel_minimap_height_changed, ingame );
@@ -1842,6 +1932,11 @@ void options_manager::serialize(JsonOut &json) const
 
     for( size_t j = 0; j < vPages.size(); ++j ) {
         for( auto &elem : mPageItems[j] ) {
+            // Skip blanks between option groups
+            // to avoid empty json entries being stored
+            if( elem.empty() ) {
+                continue;
+            }
             const auto iter = global_options.find( elem );
             if( iter != global_options.end() ) {
                 const auto &opt = iter->second;
@@ -1938,6 +2033,11 @@ bool options_manager::load_legacy()
 bool use_narrow_sidebar()
 {
     return TERMY < 25 || g->narrow_sidebar;
+}
+
+bool options_manager::has_option( const std::string &name ) const
+{
+    return global_options.count( name );
 }
 
 options_manager::cOpt &options_manager::get_option( const std::string &name )

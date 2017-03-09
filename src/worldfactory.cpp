@@ -34,7 +34,7 @@ WORLD::WORLD()
 {
     world_name = get_next_valid_worldname();
     std::ostringstream path;
-    path << FILENAMES["savedir"] << world_name;
+    path << FILENAMES["savedir"] << utf8_to_native( world_name );
     world_path = path.str();
     WORLD_OPTIONS = get_options().get_world_defaults();
 
@@ -70,7 +70,7 @@ worldfactory::worldfactory()
     tabs.push_back(std::bind(&worldfactory::show_worldgen_tab_options, this, _1, _2));
     tabs.push_back(std::bind(&worldfactory::show_worldgen_tab_confirm, this, _1, _2));
 
-    tab_strings.push_back(_("Mods to use"));
+    tab_strings.push_back(_("Content"));
     tab_strings.push_back(_("World Gen Options"));
     tab_strings.push_back(_("CONFIRMATION"));
 }
@@ -89,7 +89,7 @@ WORLDPTR worldfactory::add_world( WORLDPTR retworld )
     all_worldnames.push_back( retworld->world_name );
 
     std::ostringstream path;
-    path << FILENAMES[ "savedir" ] << retworld->world_name;
+    path << FILENAMES[ "savedir" ] << utf8_to_native( retworld->world_name );
     retworld->world_path = path.str();
 
     if( !save_world( retworld ) ) {
@@ -150,7 +150,7 @@ WORLDPTR worldfactory::make_new_world( bool show_prompt )
         std::vector<std::string>::iterator mod_it;
         for (mod_it = retworld->active_mod_order.begin(); mod_it != retworld->active_mod_order.end();) {
             MOD_INFORMATION &minfo = *mman->mod_map[*mod_it];
-            if ( minfo.need_lua ) {
+            if ( minfo.need_lua() ) {
                 mod_it = retworld->active_mod_order.erase(mod_it);
             } else {
                 mod_it++;
@@ -192,7 +192,7 @@ WORLDPTR worldfactory::make_new_world(special_game_id special_type)
     all_worldnames.push_back(worldname);
 
     std::ostringstream path;
-    path << FILENAMES["savedir"] << worldname;
+    path << FILENAMES["savedir"] << utf8_to_native( worldname );
     special_world->world_path = path.str();
 
     if (!save_world(special_world)) {
@@ -220,7 +220,7 @@ WORLDPTR worldfactory::convert_to_world(std::string origin_path)
     newworld->world_name = worldname;
 
     std::ostringstream path;
-    path << FILENAMES["savedir"] << worldname;
+    path << FILENAMES["savedir"] << utf8_to_native( worldname );
     newworld->world_path = path.str();
 
     // save world as conversion world
@@ -325,7 +325,7 @@ std::map<std::string, WORLDPTR> worldfactory::get_all_worlds()
         // the directory name is the name of the world
         std::string worldname;
         unsigned name_index = world_dir.find_last_of( "/\\" );
-        worldname = world_dir.substr( name_index + 1 );
+        worldname = native_to_utf8( world_dir.substr( name_index + 1 ) );
 
         // create and store the world
         retworlds[worldname] = new WORLD();
@@ -809,7 +809,7 @@ void worldfactory::draw_mod_list( WINDOW *w, int &start, int &cursor, const std:
 
                     auto &mod = *mman->mod_map[*iter];
 #ifndef LUA
-                    if( mod.need_lua ) {
+                    if( mod.need_lua() ) {
                         trim_and_print( w, iNum - start, 4, wwidth, c_dkgray, "%s", mod.name.c_str() );
                     } else {
                         trim_and_print( w, iNum - start, 4, wwidth, c_white, "%s", mod.name.c_str() );
@@ -1042,7 +1042,7 @@ int worldfactory::show_worldgen_tab_modselection(WINDOW *win, WORLDPTR world)
         } else if( action == "CONFIRM" ) {
             if( active_header == 0 && !current_tab_mods.empty() ) {
 #ifndef LUA
-                if( mman->mod_map[current_tab_mods[cursel[0]]]->need_lua ) {
+                if( mman->mod_map[current_tab_mods[cursel[0]]]->need_lua() ) {
                     popup(_("Can't add mod. This mod requires Lua support."));
                     redraw_active = true;
                     draw_modselection_borders(win, &ctxt);
@@ -1226,7 +1226,7 @@ to continue, or <color_yellow>%s</color> to go back and review your world."), ct
 #ifndef LUA
             for (std::string &mod : world->active_mod_order) {
                 auto &temp = *mman->mod_map[mod];
-                if ( temp.need_lua ) {
+                if ( temp.need_lua() ) {
                     popup(_("Mod '%s' requires Lua support."), temp.name.c_str());
                     return -2; // Move back to modselect tab.
                 }
@@ -1388,7 +1388,7 @@ bool worldfactory::world_need_lua_build(std::string world_name)
         return false;
     }
     for (std::string &mod : world->active_mod_order) {
-        if( mman->has_mod( mod ) && mman->mod_map[mod]->need_lua ) {
+        if( mman->has_mod( mod ) && mman->mod_map[mod]->need_lua() ) {
             return true;
         }
     }
@@ -1417,12 +1417,23 @@ bool worldfactory::valid_worldname(std::string name, bool automated)
 
 void WORLD::load_options( JsonIn &jsin )
 {
+    // if core data version isn't specified then assume version 1
+    int version = 1;
+
+    auto &opts = get_options();
+
     jsin.start_array();
     while( !jsin.end_array() ) {
         JsonObject jo = jsin.get_object();
         const std::string name = jo.get_string( "name" );
         const std::string value = jo.get_string( "value" );
-        if( get_options().get_option( name ).getPage() == "world_default" ) {
+
+        if( name == "CORE_VERSION" ) {
+            version = std::max( std::atoi( value.c_str() ), 0 );
+            continue;
+        }
+
+        if( opts.has_option( name ) && opts.get_option( name ).getPage() == "world_default" ) {
             WORLD_OPTIONS[ name ].setValue( value );
         }
     }
@@ -1430,6 +1441,8 @@ void WORLD::load_options( JsonIn &jsin )
     if( WORLD_OPTIONS.count( "CITY_SPACING" ) == 0 ) {
         WORLD_OPTIONS["CITY_SPACING"].setValue( 5 - get_option<int>( "CITY_SIZE" ) / 3 );
     }
+
+    WORLD_OPTIONS[ "CORE_VERSION" ].setValue( version );
 }
 
 void WORLD::load_legacy_options( std::istream &fin )
@@ -1441,7 +1454,8 @@ void WORLD::load_legacy_options( std::istream &fin )
         if( sLine != "" && sLine[0] != '#' && std::count( sLine.begin(), sLine.end(), ' ' ) == 1 ) {
             int ipos = sLine.find( ' ' );
             // make sure that the option being loaded is part of the world_default page in OPTIONS
-            if( get_options().get_option( sLine.substr( 0, ipos ) ).getPage() == "world_default" ) {
+            // In 0.C some lines consisted of a space and nothing else
+            if( ipos != 0 && get_options().get_option( sLine.substr( 0, ipos ) ).getPage() == "world_default" ) {
                 WORLD_OPTIONS[sLine.substr( 0, ipos )].setValue( sLine.substr( ipos + 1, sLine.length() ) );
             }
         }
@@ -1454,7 +1468,7 @@ bool worldfactory::load_world_options(WORLDPTR &world)
 
     using namespace std::placeholders;
     const auto path = world->world_path + "/" + FILENAMES["worldoptions"];
-    if( read_from_file_optional( path, std::bind( &WORLD::load_options, world, _1 ) ) ) {
+    if( read_from_file_optional_json( path, std::bind( &WORLD::load_options, world, _1 ) ) ) {
         return true;
     }
 

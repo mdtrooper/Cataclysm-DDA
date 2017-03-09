@@ -1,11 +1,5 @@
 [
 {
-    "type" : "ITEM_CATEGORY",
-    "id" : "chems",
-    "name" : "CHEMICAL STUFF",
-    "sort_rank" : 5
-},
-{
     "type" : "AMMO",
     "id" : "chem_sulphur",
     "category" : "spare_parts",
@@ -120,22 +114,6 @@
     "weight": 700,
     "volume": 4,
     "bashing": 2,
-    "to_hit": -2
-   },
-   {
-    "type":"GENERIC",
-    "id": "material_aluminium_ingot",
-    "symbol": ",",
-    "color": "light_gray",
-    "name": "aluminum ingot",
-    "category": "spare_parts",
-    "description": "A small aluminum ingot, standardized for further processing.  Light but durable, this could be cast into various shapes for construction or ground down to a powder, for more... high-profile applications.",
-    "price": 2000,
-    "price_postapoc": 500,
-    "material": "aluminum",
-    "weight": 2000,
-    "volume": 4,
-    "bashing": 1,
     "to_hit": -2
    },
    {
@@ -280,7 +258,6 @@
     "price" : 0,
     "volume" : 1,
     "phase" : "liquid",
-    "charges" : 1,
     "category" : "chems",
     "fun" : -1
    },
@@ -301,7 +278,6 @@
     "price" : 0,
     "volume" : 1,
     "phase" : "liquid",
-    "charges" : 1,
     "category" : "chems",
     "fun" : -30
    },
@@ -322,7 +298,6 @@
     "price" : 0,
     "volume" : 1,
     "phase" : "liquid",
-    "charges" : 1,
     "category" : "chems",
     "fun" : -15
    },
@@ -343,9 +318,13 @@
     "price" : 2000,
     "volume" : 1,
     "phase" : "liquid",
-    "charges" : 1,
     "category" : "chems",
-    "fun" : -30
+    "fun" : -30,
+    "drop_action": {
+        "type": "emit_actor",
+        "emits": [ "emit_acid_splash" ],
+        "scale_qty": true
+    }
    },
    {
     "type" : "COMESTIBLE",
@@ -363,7 +342,6 @@
     "price" : 0,
     "volume" : 1,
     "phase" : "liquid",
-    "charges" : 1,
     "category" : "chems",
     "fun" : -20
    },
@@ -419,7 +397,12 @@
     "ammo_type" : "components",
     "charges" : 2,
     "phase" : "liquid",
-    "container" : "bottle_glass"
+    "container" : "bottle_glass",
+    "drop_action": {
+        "type": "emit_actor",
+        "emits": [ "emit_acid_drop" ],
+        "scale_qty": true
+    }
    },
 {
     "type" : "AMMO",
@@ -435,7 +418,6 @@
     "weight" : 200,
     "bashing" : 1,
     "ammo_type" : "components",
-    "charges" : 1,
     "phase" : "liquid",
     "container" : "bottle_glass"
    },
@@ -455,7 +437,12 @@
     "ammo_type" : "components",
     "charges" : 2,
     "phase" : "liquid",
-    "container" : "bottle_glass"
+    "container" : "bottle_glass",
+    "drop_action": {
+        "type": "emit_actor",
+        "emits": [ "emit_acid_drop" ],
+        "scale_qty": true
+    }
    },
 {
     "type" : "AMMO",
@@ -525,7 +512,6 @@
     "weight" : 325,
     "bashing" : 1,
     "ammo_type" : "components",
-    "charges" : 1,
     "phase" : "liquid",
     "container" : "bottle_glass"
    },
@@ -566,6 +552,22 @@
     "count" : 50
    },
 {
+    "type" : "GENERIC",
+    "id" : "material_niter",
+    "category" : "spare_parts",
+    "price" : 75,
+    "name" : "niter",
+    "name_plural" : "niter",
+    "symbol" : "*",
+    "color" : "white",
+    "description" : "A large crystal of niter, the mineral form of potassium nitrate.  It can be processed into saltpeter.",
+    "material" : "powder",
+    "volume" : 5,
+    "weight" : 790,
+    "bashing" : 1,
+    "ammo_type" : "components"
+   },
+{
     "type" : "AMMO",
     "id" : "chem_aluminium_sulphate",
     "category" : "chems",
@@ -597,7 +599,6 @@
     "weight" : 300,
     "bashing" : 1,
     "ammo_type" : "components",
-    "charges" : 1,
     "phase" : "liquid",
     "container" : "bottle_glass"
    },
@@ -623,7 +624,7 @@
     "type" : "AMMO",
     "id" : "chem_anfo",
     "category" : "spare_parts",
-    "price" : 500,
+    "price" : 5000,
     "name" : "ANFO",
     "name_plural" : "ANFO",
     "symbol" : "=",
@@ -631,11 +632,11 @@
     "description" : "Several brownish pellets that were made by absorbing organic fuel on ammonium nitrate.  This ammonium nitrate–fuel oil or ANFO, as it is called, mixture is a common industrial explosive due to its stability and low price.  Burns fast, but needs an explosive primer to detonate...",
     "material" : "powder",
     "volume" : 1,
-    "weight" : 9,
+    "weight" : 90,
     "bashing" : 1,
     "ammo_type" : "components",
     "container" : "bag_canvas",
-    "count" : 50
+    "count" : 5
    },
    {
     "type" : "AMMO",

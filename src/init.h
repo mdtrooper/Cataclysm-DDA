@@ -1,3 +1,4 @@
+#pragma once
 #ifndef INIT_H
 #define INIT_H
 
@@ -5,11 +6,9 @@
 
 #include <string>
 #include <vector>
+#include <list>
 #include <memory>
 #include <functional>
-
-class Item_factory;
-class vpart_info;
 
 /**
  * This class is used to load (and unload) the dynamic
@@ -49,14 +48,20 @@ class vpart_info;
  */
 class DynamicDataLoader
 {
-        friend Item_factory;
-        friend vpart_info;
-
     public:
         typedef std::string type_string;
         typedef std::map<type_string, std::function<void( JsonObject &, const std::string & )>>
                 t_type_function_map;
         typedef std::vector<std::string> str_vec;
+
+        /**
+         * JSON data dependent upon as-yet unparsed definitions
+         * first: JSON data, second: source identifier
+         */
+        typedef std::list<std::pair<std::string, std::string>> deferred_json;
+
+    private:
+        bool finalized = false;
 
     protected:
         /**
@@ -120,6 +125,18 @@ class DynamicDataLoader
          * @ref check_consistency
          */
         void finalize_loaded_data();
+
+        /**
+         * Loads and then removes entries from @param data
+         */
+        void load_deferred( deferred_json &data );
+
+        /**
+         * Returns whether the data is finalized and ready to be utilized.
+         */
+        bool is_data_finalized() const {
+            return finalized;
+        }
 };
 
 void init_names();

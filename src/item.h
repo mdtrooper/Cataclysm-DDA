@@ -1,3 +1,4 @@
+#pragma once
 #ifndef ITEM_H
 #define ITEM_H
 
@@ -18,6 +19,8 @@
 #include "item_location.h"
 #include "damage.h"
 #include "debug.h"
+#include "units.h"
+#include "cata_utility.h"
 
 class game;
 class Character;
@@ -268,8 +271,8 @@ class item : public JsonSerializer, public JsonDeserializer, public visitable<it
     /** Burns the item. Returns true if the item was destroyed. */
     bool burn( fire_data &bd );
 
- // Returns the category of this item.
- const item_category &get_category() const;
+    // Returns the category of this item.
+    const item_category &get_category() const;
 
     class reload_option {
         public:
@@ -345,13 +348,10 @@ class item : public JsonSerializer, public JsonDeserializer, public visitable<it
 
     /* Total volume of an item accounting for all contained/integrated items
      * @param integral if true return effective volume if item was integrated into another */
-    int volume( bool integral = false ) const;
+    units::volume volume( bool integral = false ) const;
 
     /** Simplified, faster volume check for when processing time is important and exact volume is not. */
-    int base_volume() const;
-
-    /* Volume of an item or of a single unit for charged items multipled by 1000 */
-    int precise_unit_volume() const;
+    units::volume base_volume() const;
 
     /** Required strength to be able to successfully lift the item unaided by equipment */
     int lift_strength() const;
@@ -369,34 +369,30 @@ class item : public JsonSerializer, public JsonDeserializer, public visitable<it
      * takes. The actual time depends heavily on the attacker, see melee.cpp.
      */
     int attack_time() const;
-    /**
-     * Damage of type @ref DT_BASH that is caused by using this item as melee weapon.
-     */
-    int damage_bash() const;
-    /**
-     * Damage of type @ref DT_CUT that is caused by using this item as melee weapon.
-     */
-    int damage_cut() const;
-    /**
-     * Damage of a given type that is caused by using this item as melee weapon.
-     * NOTE: Does NOT respect the legacy "stabbing is cutting"!
-     */
-    int damage_by_type( damage_type dt ) const;
+
+    /** Damage of given type caused when this item is used as melee weapon */
+    int damage_melee( damage_type dt ) const;
+
     /**
      * Whether the character needs both hands to wield this item.
      */
     bool is_two_handed( const player &u ) const;
-    /** The weapon is considered a suitable melee weapon. */
-    bool is_weap() const;
-    /** The item is considered a bashing weapon (inflicts a considerable bash damage). */
-    bool is_bashing_weapon() const;
-    /** The item is considered a cutting weapon (inflicts a considerable cutting damage). */
-    bool is_cutting_weapon() const;
+
+    /** Is this item an effective melee weapon for the given damage type? */
+    bool is_melee( damage_type dt ) const;
+
+    /**
+     *  Is this item an effective melee weapon for any damage type?
+     *  @see item::is_gun()
+     *  @note an item can be both a gun and melee weapon concurrently
+     */
+    bool is_melee() const;
+
     /**
      * The most relevant skill used with this melee weapon. Can be "null" if this is not a weapon.
      * Note this function returns null if the item is a gun for which you can use gun_skill() instead.
      */
-    skill_id weap_skill() const;
+    skill_id melee_skill() const;
     /*@}*/
 
     /** Max range weapon usable for melee attack accounting for player/NPC abilities */
@@ -416,6 +412,14 @@ class item : public JsonSerializer, public JsonDeserializer, public visitable<it
      * @return true if this item should be deleted (count-by-charges items with no remaining charges)
      */
     bool use_charges( const itype_id& what, long& qty, std::list<item>& used, const tripoint& pos );
+
+    /**
+     * Invokes item type's @ref drop_action.
+     * This function can change the item.
+     * @param pos Where is the item being placed. Note: the item isn't there yet.
+     * @return true if the item was destroyed during placement.
+     */
+    bool on_drop( const tripoint &pos );
 
  /**
   * Consume a specific amount of items of a specific type.
@@ -470,11 +474,9 @@ class item : public JsonSerializer, public JsonDeserializer, public visitable<it
     long get_remaining_capacity_for_liquid( const item &liquid, const Character &p,
                                             std::string *err = nullptr ) const;
     /**
-     * It returns the total capacity (volume) of the container. This is a volume,
-     * use @ref liquid_charges (of a liquid item) to translate that volume to the
-     * number charges of a liquid that can be store in it.
+     * It returns the total capacity (volume) of the container.
      */
-    long get_container_capacity() const;
+    units::volume get_container_capacity() const;
     /**
      * Puts the given item into this one, no checks are performed.
      */
@@ -502,7 +504,7 @@ class item : public JsonSerializer, public JsonDeserializer, public visitable<it
     /**
      * Funnel related functions. See weather.cpp for their usage.
      */
-    bool is_funnel_container(int &bigger_than) const;
+    bool is_funnel_container(units::volume &bigger_than) const;
     void add_rain_to_container(bool acid, int charges = 1);
     /*@}*/
 
@@ -535,6 +537,17 @@ class item : public JsonSerializer, public JsonDeserializer, public visitable<it
 
     /** Set current item @ref rot relative to shelf life (no-op if item does not spoil) */
     void set_relative_rot( double val );
+
+    /**
+     * Get time left to rot, ignoring fridge.
+     * Returns time to rot if item is able to, max int - N otherwise,
+     * where N is
+     * 3 for food,
+     * 2 for medication,
+     * 1 for other comestibles,
+     * 0 otherwise.
+     */
+    int spoilage_sort_order();
 
     /** an item is fresh if it is capable of rotting but still has a long shelf life remaining */
     bool is_fresh() const { return goes_bad() && get_relative_rot() < 0.1; }
@@ -678,7 +691,7 @@ public:
     int chip_resistance( bool worst = false ) const;
 
     /** How much damage has the item sustained? */
-    int damage() const;
+    int damage() const { return fast_floor( damage_ ); }
 
     /** Minimum amount of damage to an item (state of maximum repair) */
     int min_damage() const;
@@ -708,6 +721,9 @@ public:
 
     /** Provide prefix symbol for UI display dependent upon current item damage level */
     std::string damage_symbol() const;
+
+    /** If possible to repair this item what tools could potentially be used for this purpose? */
+    const std::set<itype_id>& repaired_with() const;
 
     /**
      * Check whether the item has been marked (by calling mark_as_used_by_player)
@@ -779,13 +795,11 @@ public:
  bool destroyed_at_zero_charges() const;
 // Most of the is_whatever() functions call the same function in our itype
  bool is_null() const; // True if type is NULL, or points to the null item (id == 0)
- bool is_food(player const*u) const;// Some non-food items are food to certain players
- bool is_food_container(player const*u) const;  // Ditto
+ bool is_comestible() const;
  bool is_food() const;                // Ignoring the ability to eat batteries, etc.
  bool is_food_container() const;      // Ignoring the ability to eat batteries, etc.
  bool is_ammo_container() const; // does this item contain ammo? (excludes magazines)
  bool is_medication() const;            // Is it a medication that only pretends to be food?
- bool is_medication_container() const;  // Does it contain medication that isn't actually food?
  bool is_bionic() const;
  bool is_magazine() const;
  bool is_ammo_belt() const;
@@ -794,7 +808,6 @@ public:
  bool is_armor() const;
  bool is_book() const;
  bool is_salvageable() const;
- bool is_disassemblable() const;
 
  bool is_tool() const;
  bool is_tool_reversible() const;
@@ -806,6 +819,8 @@ public:
     bool is_brewable() const;
     bool is_engine() const;
     bool is_wheel() const;
+    bool is_fuel() const;
+    bool is_toolmod() const;
 
     bool is_faulty() const;
 
@@ -814,6 +829,9 @@ public:
 
     /** Returns the total area of this wheel or 0 if it isn't one. */
     int wheel_area() const;
+
+    /** Returns energy of one charge of this item as fuel for an engine. */
+    float fuel_energy() const;
 
     /**
      * Can this item have given item/itype as content?
@@ -874,6 +892,10 @@ public:
  const itype* type;
  std::list<item> contents;
 
+        /**
+         * Return a contained item (if any and only one).
+         */
+        const item &get_contained() const;
         /**
          * Unloads the item's contents.
          * @param c Character who receives the contents.
@@ -938,21 +960,13 @@ public:
         std::string type_name( unsigned int quantity = 1 ) const;
 
         /**
-         * Liquids use a different (and type specific) scale for the charges vs volume.
-         * This functions converts them. You can assume that
-         * @code liquid_charges( liquid_units( x ) ) == x @endcode holds true.
-         * For items that are not liquids or otherwise don't use this system, both functions
-         * simply return their input (conversion factor is 1).
-         * One "unit" takes up one container storage capacity, e.g.
-         * A container with @ref islot_container::contains == 2 can store
-         * @code liquid.liquid_charges( 2 ) @endcode charges of the given liquid.
-         * For water this would be 2, for most strong alcohols it's 14, etc.
+         * Number of charges of this item that fit into the given volume.
+         * May return 0 if not even one charge fits into the volume. Only depends on the *type*
+         * of this item not on its current charge count.
+         *
+         * For items not counted by charges, this returns this->volume() / vol.
          */
-        /*@{*/
-        long liquid_charges( long units ) const;
-        long liquid_charges_per_volume( int volume ) const;
-        long liquid_units( long charges ) const;
-        /*@}*/
+        long charges_per_volume( const units::volume &vol ) const;
 
         /**
          * @name Item variables
@@ -1007,6 +1021,13 @@ public:
         /*@{*/
         bool has_flag( const std::string& flag ) const;
         bool has_any_flag( const std::vector<std::string>& flags ) const;
+
+        /** Idempotent filter setting an item specific flag. */
+        item& set_flag( const std::string &flag );
+
+        /** Idempotent filter removing an item specific flag */
+        item& unset_flag( const std::string &flag );
+
         /** Removes all item specific flags. */
         void unset_flags();
         /*@}*/
@@ -1091,8 +1112,10 @@ public:
          * @code if( some_armor.get_covered_body_parts().test( bp_head ) ) { ... } @endcode
          * For testing only a single body part, use @ref covers instead. This function allows you
          * to get the whole covering data in one call.
+         * @param side Specifies the side. Will be ignored for non-sided items.
          */
         std::bitset<num_bp> get_covered_body_parts() const;
+        std::bitset<num_bp> get_covered_body_parts( side s ) const;
         /**
           * Returns true if item is armor and can be worn on different sides of the body
           */
@@ -1100,11 +1123,16 @@ public:
         /**
          *  Returns side item currently worn on. Returns BOTH if item is not sided or no side currently set
          */
-        int get_side() const;
+        side get_side() const;
         /**
           * Change the side on which the item is worn. Returns false if the item is not sided
           */
         bool set_side (side s);
+
+        /**
+         * Swap the side on which the item is worn. Returns false if the item is not sided
+         */
+        bool swap_side();
         /**
          * Returns the warmth value that this item has when worn. See player class for temperature
          * related code, or @ref player::warmth. Returned values should be positive. A value
@@ -1137,7 +1165,7 @@ public:
          * For non-armor it returns 0. The storage amount increases the volume capacity of the
          * character that wears the item.
          */
-        int get_storage() const;
+        units::volume get_storage() const;
         /**
          * Returns the resistance to environmental effects (@ref islot_armor::env_resist) that this
          * item provides when worn. See @ref player::get_env_resist. Higher values are better.
@@ -1208,6 +1236,10 @@ public:
         void add_technique( const matec_id & tech );
         /*@}*/
 
+        /** Returns all toolmods currently attached to this item (always empty if item not a tool) */
+        std::vector<item *> toolmods();
+        std::vector<const item *> toolmods() const;
+
         /**
          * @name Gun and gunmod functions
          *
@@ -1217,6 +1249,12 @@ public:
          */
         /*@{*/
         bool is_gunmod() const;
+
+        /**
+         *  Can this item be used to perform a ranged attack?
+         *  @see item::is_melee()
+         *  @note an item can be both a gun and melee weapon concurrently
+         */
         bool is_gun() const;
 
         /** Quantity of ammunition currently loaded in tool, gun or axuiliary gunmod */
@@ -1300,17 +1338,20 @@ public:
 
         /*
          * Checks if mod can be applied to this item considering any current state (jammed, loaded etc.)
-         * @param alert whether to display message describing reason for any incompatibility
-         * @param effects whether temporary efects (jammed, loaded etc) are considered when checking
+         * @param msg message describing reason for any incompatibility
          */
-        bool gunmod_compatible( const item& mod, bool alert = true, bool effects = true ) const;
+        bool gunmod_compatible( const item& mod, std::string *msg = nullptr ) const;
 
         struct gun_mode {
-            std::string mode;           /** name of this mode */
-            item *target = nullptr;     /** pointer to base gun or attached gunmod */
-            int qty = 0;                /** burst size or melee range */
-
-            /** flags change behavior of gun mode and are **not** equivalent to item flags */
+            /* contents of `modes` for GUN type, `mode_modifier` for GUNMOD type,
+             * `gunmod_data:mode_modifier` for GENERIC or TOOL types */
+            /** name of this mode, e.g. `bayonet` for bayonets, `auto` for automatic fire, etc. */
+            std::string mode;
+            /** pointer to item providing this mode - base gun or attached gunmod */
+            item *target = nullptr;
+            /** burst size for is_gun() firearms, or melee range for is_melee() weapons */
+            int qty = 0;
+            /** flags change behavior of gun mode, e.g. MELEE for bayonets that make a reach attack instead of firing - these are **not** equivalent to item flags! */
             std::set<std::string> flags;
 
             gun_mode() = default;
@@ -1381,10 +1422,15 @@ public:
          * Summed range value of a gun, including values from mods. Returns 0 on non-gun items.
          */
         int gun_range( bool with_ammo = true ) const;
+
         /**
-         * Summed recoils value of a gun, including values from mods. Returns 0 on non-gun items.
+         *  Get effective recoil considering handling, loaded ammo and effects of attached gunmods
+         *  @param p player stats such as STR can alter effective recoil
+         *  @param bipod whether any bipods should be considered
+         *  @return effective recoil (per shot) or zero if gun uses ammo and none is loaded
          */
-        int gun_recoil( bool with_ammo = true ) const;
+        int gun_recoil( const player &p, bool bipod = false ) const;
+
         /**
          * Summed ranged damage of a gun, including values from mods. Returns 0 on non-gun items.
          */
@@ -1493,12 +1539,15 @@ public:
 
         bool has_infinite_charges() const;
 
+        /** Puts the skill in context of the item */
+        skill_id contextualize_skill( const skill_id &id ) const;
+
     private:
-        std::string name;
         double damage_ = 0;
         const itype* curammo = nullptr;
         std::map<std::string, std::string> item_vars;
         const mtype* corpse = nullptr;
+        std::string corpse_name;       // Name of the late lamented
         std::set<matec_id> techniques; // item specific techniques
         light_emission light = nolight;
 

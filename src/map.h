@@ -1,3 +1,4 @@
+#pragma once
 #ifndef MAP_H
 #define MAP_H
 
@@ -40,8 +41,11 @@ class computer;
 struct itype;
 struct mapgendata;
 struct trap;
+struct oter_t;
+
 using trap_id = int_id<trap>;
-struct oter_id;
+using oter_id = int_id<oter_t>;
+
 struct regional_settings;
 struct mongroup;
 struct ter_t;
@@ -55,6 +59,8 @@ using mtype_id = string_id<mtype>;
 struct projectile;
 struct veh_collision;
 class tileray;
+class harvest_list;
+using harvest_id = string_id<harvest_list>;
 
 // TODO: This should be const& but almost no functions are const
 struct wrapped_vehicle{
@@ -83,27 +89,18 @@ struct pathfinding_cache;
 
 class map_stack : public item_stack {
 private:
-    std::list<item> *mystack;
     tripoint location;
     map *myorigin;
 public:
     map_stack( std::list<item> *newstack, tripoint newloc, map *neworigin ) :
-    mystack(newstack), location(newloc), myorigin(neworigin) {};
-    size_t size() const override;
-    bool empty() const override;
+    item_stack( newstack ), location(newloc), myorigin(neworigin) {};
     std::list<item>::iterator erase( std::list<item>::iterator it ) override;
     void push_back( const item &newitem ) override;
     void insert_at( std::list<item>::iterator index, const item &newitem ) override;
-    std::list<item>::iterator begin();
-    std::list<item>::iterator end();
-    std::list<item>::const_iterator begin() const;
-    std::list<item>::const_iterator end() const;
-    std::list<item>::reverse_iterator rbegin();
-    std::list<item>::reverse_iterator rend();
-    std::list<item>::const_reverse_iterator rbegin() const;
-    std::list<item>::const_reverse_iterator rend() const;
-    item &front() override;
-    item &operator[]( size_t index ) override;
+    int count_limit() const override {
+        return MAX_ITEM_IN_SQUARE;
+    }
+    units::volume max_volume() const override;
 };
 
 struct visibility_variables {
@@ -375,6 +372,13 @@ public:
      */
     bool valid_move( const tripoint &from, const tripoint &to,
                      const bool bash = false, const bool flying = false ) const;
+                     
+    /**
+     * Size of map objects at `p` for purposes of ranged combat.
+     * Size is in percentage of tile: if 1.0, all attacks going through tile
+     * should hit map objects on it, if 0.0 there is nothing to be hit (air/water).
+     */
+    double ranged_target_size( const tripoint &p ) const;
 
 
 // 3D Sees:
@@ -435,18 +439,16 @@ public:
  std::vector<tripoint> get_dir_circle( const tripoint &f, const tripoint &t ) const;
 
     /**
-     * Calculate a best path using A*
+     * Calculate the best path using A*
      *
      * @param f The source location from which to path.
      * @param t The destination to which to path.
-     * @param bash Bashing strength of pathing creature (0 means no bashing through terrain).
-     * @param maxdist Consider only paths up to this length (move cost multiplies "length" of a tile).
+     * @param settings Structure describing pathfinding parameters.
+     * @param pre_closed Never path through those points. They can still be the source or the destination.
      */
     std::vector<tripoint> route( const tripoint &f, const tripoint &t,
-                                 const int bash, const int maxdist,
-                                 const std::set<tripoint> &pre_closed ) const;
-    std::vector<tripoint> route( const tripoint &f, const tripoint &t,
-                                 const int bash, const int maxdist ) const;
+                                 const pathfinding_settings &settings,
+                                 const std::set<tripoint> &pre_closed = {{ }} ) const;
 
  int coord_to_angle(const int x, const int y, const int tgtx, const int tgty) const;
 // Vehicles: Common to 2D and 3D
@@ -556,18 +558,21 @@ public:
     bool can_move_furniture( const tripoint &pos, player * p = nullptr );
 // Terrain: 2D overloads
     ter_id ter(const int x, const int y) const; // Terrain integer id at coord (x, y); {x|y}=(0, SEE{X|Y}*3]
-    std::string get_ter_harvestable(const int x, const int y) const; // harvestable of the terrain
-    ter_id get_ter_transforms_into(const int x, const int y) const; // get the terrain id to transform to
-    int get_ter_harvest_season(const int x, const int y) const; // get season to harvest the terrain
 
     void ter_set(const int x, const int y, const ter_id new_terrain);
 
     std::string tername(const int x, const int y) const; // Name of terrain at (x, y)
 // Terrain: 3D
     ter_id ter( const tripoint &p ) const;
-    std::string get_ter_harvestable( const tripoint &p ) const;
+    /**
+     * Returns the full harvest list, for spawning.
+     */
+    const harvest_id &get_harvest( const tripoint &p ) const;
+    /**
+     * Returns names of the items that would be dropped.
+     */
+    const std::set<std::string> &get_harvest_names( const tripoint &p ) const;
     ter_id get_ter_transforms_into( const tripoint &p ) const;
-    int get_ter_harvest_season( const tripoint &p ) const;
 
     void ter_set( const tripoint &p, const ter_id new_terrain);
 
@@ -596,6 +601,17 @@ public:
      * Checks for existence of items. Faster than i_at(p).empty
      */
     bool has_items( const tripoint &p ) const;
+
+    /**
+     * Calls the examine function of furniture or terrain at given tile, for given character.
+     * Will only examine terrain if furniture had @ref iexamine::none as the examine function.
+     */
+    void examine( Character &p, const tripoint &pos );
+
+    /**
+     * Returns true if point at pos is harvestable right now, with no extra tools.
+     */
+    bool is_harvestable( const tripoint &pos ) const;
 
 // Flags: 2D overloads
     std::string features(const int x, const int y); // Words relevant to terrain (sharp, etc)
@@ -728,10 +744,6 @@ void add_corpse( const tripoint &p );
 // Effects of attacks/items
     bool hit_with_acid( const tripoint &p );
     bool hit_with_fire( const tripoint &p );
-    bool marlossify( const tripoint &p );
-    /** Makes spores at p. source is used for kill counting */
-    void create_spores( const tripoint &p, Creature* source = nullptr );
-    void fungalize( const tripoint &p, Creature *source = nullptr, double spore_chance = 0.0 );
 
     bool has_adjacent_furniture( const tripoint &p );
      /** Remove moppable fields/items at this location
@@ -782,10 +794,9 @@ void add_corpse( const tripoint &p );
     void spawn_item(const int x, const int y, const std::string &itype_id,
                     const unsigned quantity=1, const long charges=0,
                     const unsigned birthday=0, const int damlevel=0);
-    int max_volume(const int x, const int y);
-    int free_volume(const int x, const int y);
-    int stored_volume(const int x, const int y);
-    bool add_item_or_charges(const int x, const int y, item new_item, int overflow_radius = 2);
+
+    item &add_item_or_charges( const int x, const int y, item obj, bool overflow = true );
+
     void add_item(const int x, const int y, item new_item);
     void spawn_an_item( const int x, const int y, item new_item,
                         const long charges, const int damlevel );
@@ -809,12 +820,27 @@ void add_corpse( const tripoint &p );
     void spawn_item( const tripoint &p, const std::string &itype_id,
                      const unsigned quantity=1, const long charges=0,
                      const unsigned birthday=0, const int damlevel=0);
-    int max_volume( const tripoint &p );
-    int free_volume( const tripoint &p );
-    int stored_volume( const tripoint &p );
-    bool is_full( const tripoint &p, const int addvolume = -1, const int addnumber = -1 );
-    item &add_item_or_charges( const tripoint &p, item new_item, int overflow_radius = 2 );
+    units::volume max_volume( const tripoint &p );
+    units::volume free_volume( const tripoint &p );
+    units::volume stored_volume( const tripoint &p );
+
+    /**
+     *  Adds an item to map tile or stacks charges
+     *  @param overflow if destination is full attempt to drop on adjacent tiles
+     *  @return reference to dropped (and possibly stacked) item or null item on failure
+     *  @warning function is relatively expensive and meant for user initiated actions, not mapgen
+     */
+    item &add_item_or_charges( const tripoint &pos, item obj, bool overflow = true );
+
+    /** Helper for map::add_item */
     item &add_item_at( const tripoint &p, std::list<item>::iterator index, item new_item );
+    /**
+     * Place an item on the map, despite the parameter name, this is not necessaraly a new item.
+     * WARNING: does -not- check volume or stack charges. player functions (drop etc) should use
+     * map::add_item_or_charges
+     *
+     * @ret The item that got added, or nulitem.
+     */
     item &add_item( const tripoint &p, item new_item );
     item &spawn_an_item( const tripoint &p, item new_item,
                         const long charges, const int damlevel);
@@ -975,8 +1001,11 @@ void add_corpse( const tripoint &p );
         void propagate_field( const tripoint &center, field_id fid,
                               int amount, int max_density = MAX_FIELD_DENSITY );
 
-        /** Runs one cycle of emission @ref src which **may** result in propagation of fields */
-        void emit_field( const tripoint &pos, const emit_id &src );
+        /**
+         * Runs one cycle of emission @ref src which **may** result in propagation of fields
+         * @param mul Multiplies the chance and possibly qty (if `chance*mul > 100`) of the emission
+         */
+        void emit_field( const tripoint &pos, const emit_id &src, float mul = 1.0f );
 
 // End of 3D field function block
 
@@ -1035,6 +1064,7 @@ public:
     void drop_furniture( const tripoint &p );
     void drop_items( const tripoint &p );
     void drop_vehicle( const tripoint &p );
+    void drop_fields( const tripoint &p );
     /*@}*/
 
     /**
@@ -1044,14 +1074,13 @@ public:
 
 // mapgen.cpp functions
  void generate(const int x, const int y, const int z, const int turn);
- void post_process(unsigned zones);
  void place_spawns(const mongroup_id& group, const int chance,
                    const int x1, const int y1, const int x2, const int y2, const float density);
  void place_gas_pump(const int x, const int y, const int charges);
  void place_gas_pump(const int x, const int y, const int charges, std::string fuel_type);
  void place_toilet(const int x, const int y, const int charges = 6 * 4); // 6 liters at 250 ml per charge
  void place_vending(int x, int y, std::string type);
- int place_npc(int x, int y, std::string type);
+ int place_npc( int x, int y, const std::string &type );
 
  void add_spawn(const mtype_id& type, const int count, const int x, const int y, bool friendly = false,
                 const int faction_id = -1, const int mission_id = -1,
@@ -1136,8 +1165,8 @@ public:
  int getmapsize() const { return my_MAPSIZE; };
  bool has_zlevels() const { return zlevels; }
 
- // Not protected/private for mapgen_functions.cpp access
- void rotate(const int turns);// Rotates the current map 90*turns degress clockwise
+    // Not protected/private for mapgen_functions.cpp access
+    void rotate(int turns);   // Rotates the current map 90*turns degress clockwise
                               // Useful for houses, shops, etc
 
 // Monster spawning:
@@ -1244,7 +1273,7 @@ public:
 protected:
  void generate_lightmap( int zlev );
  void build_seen_cache( const tripoint &origin, int target_z );
- void apply_character_light( const player &p );
+ void apply_character_light( player &p );
 
  int my_MAPSIZE;
  bool zlevels;
@@ -1337,22 +1366,22 @@ private:
                           const tripoint &view_center,
                           bool low_light, bool bright_light, bool inorder ) const;
 
- long determine_wall_corner( const tripoint &p ) const;
- void cache_seen(const int fx, const int fy, const int tx, const int ty, const int max_range);
- // apply a circular light pattern immediately, however it's best to use...
- void apply_light_source( const tripoint &p, float luminance);
- // ...this, which will apply the light after at the end of generate_lightmap, and prevent redundant
- // light rays from causing massive slowdowns, if there's a huge amount of light.
- void add_light_source( const tripoint &p, float luminance);
- // Handle just cardinal directions and 45 deg angles.
- void apply_directional_light( const tripoint &p, int direction, float luminance );
- void apply_light_arc( const tripoint &p, int angle, float luminance, int wideangle = 30 );
- void apply_light_ray(bool lit[MAPSIZE*SEEX][MAPSIZE*SEEY],
-                      const tripoint &s, const tripoint &e, float luminance);
- void add_light_from_items( const tripoint &p, std::list<item>::iterator begin,
-                            std::list<item>::iterator end );
- void calc_ray_end(int angle, int range, const tripoint &p, tripoint &out ) const;
- vehicle *add_vehicle_to_map( std::unique_ptr<vehicle> veh, bool merge_wrecks);
+    long determine_wall_corner( const tripoint &p ) const;
+    void cache_seen( const int fx, const int fy, const int tx, const int ty, const int max_range );
+    // apply a circular light pattern immediately, however it's best to use...
+    void apply_light_source( const tripoint &p, float luminance);
+    // ...this, which will apply the light after at the end of generate_lightmap, and prevent redundant
+    // light rays from causing massive slowdowns, if there's a huge amount of light.
+    void add_light_source( const tripoint &p, float luminance);
+    // Handle just cardinal directions and 45 deg angles.
+    void apply_directional_light( const tripoint &p, int direction, float luminance );
+    void apply_light_arc( const tripoint &p, int angle, float luminance, int wideangle = 30 );
+    void apply_light_ray( bool lit[MAPSIZE*SEEX][MAPSIZE*SEEY],
+                          const tripoint &s, const tripoint &e, float luminance );
+    void add_light_from_items( const tripoint &p, std::list<item>::iterator begin,
+                               std::list<item>::iterator end );
+    void calc_ray_end( int angle, int range, const tripoint &p, tripoint &out ) const;
+    vehicle *add_vehicle_to_map( std::unique_ptr<vehicle> veh, bool merge_wrecks );
 
     // Internal methods used to bash just the selected features
     // Information on what to bash/what was bashed is read from/written to the bash_params struct

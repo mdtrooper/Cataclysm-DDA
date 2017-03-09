@@ -30,6 +30,7 @@
 #include "mtype.h"
 #include "field.h"
 #include "filesystem.h"
+#include "string_input_popup.h"
 extern "C" {
 #include "lua.h"
 #include "lualib.h"
@@ -43,6 +44,7 @@ extern "C" {
 #endif
 
 using item_stack_iterator = std::list<item>::iterator;
+using volume = units::volume;
 
 lua_State *lua_state = nullptr;
 
@@ -822,7 +824,7 @@ void lua_callback(const char *callback_name)
 }
 
 //
-int lua_mapgen(map *m, std::string terrain_type, mapgendata, int t, float, const std::string &scr)
+int lua_mapgen(map *m, const oter_id &terrain_type, const mapgendata &, int t, float, const std::string &scr)
 {
     if( lua_state == nullptr ) {
         return 0;
@@ -838,7 +840,7 @@ int lua_mapgen(map *m, std::string terrain_type, mapgendata, int t, float, const
     //    int function_index = luaL_ref(L, LUA_REGISTRYINDEX); // todo; make use of this
     //    lua_rawgeti(L, LUA_REGISTRYINDEX, function_index);
 
-    lua_pushstring(L, terrain_type.c_str());
+    lua_pushstring(L, terrain_type.id().c_str());
     lua_setglobal(L, "tertype");
     lua_pushinteger(L, t);
     lua_setglobal(L, "turn");
@@ -867,6 +869,10 @@ const ter_t &get_terrain_type(int id)
 
 static calendar &get_calendar_turn_wrapper() {
     return calendar::turn;
+}
+
+static std::string string_input_popup_wrapper(std::string title, int width, std::string desc) {
+    return string_input_popup().title(title).width(width).description(desc).query();
 }
 
 /** Create a new monster of the given type. */

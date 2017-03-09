@@ -79,7 +79,7 @@
         "id" : "FASTHEALER",
         "name" : "Fast Healer",
         "points" : 2,
-        "description" : "You heal a little faster than most; sleeping will heal more lost HP.",
+        "description" : "You heal faster when sleeping and will even recover small amount of HP when not sleeping.",
         "starting_trait" : true,
         "cancels" : ["ROT1", "ROT2", "ROT3", "SLOWHEALER", "MET_RAT"],
         "changes_to" : ["FASTHEALER2", "REGEN_LIZ"],
@@ -281,9 +281,10 @@
         "id" : "GOURMAND",
         "name" : "Gourmand",
         "points" : 2,
-        "description" : "You eat faster, and can eat and drink more, than anyone else!  You also enjoy food more; delicious food is better for your morale, and you don't mind unsavory meals as much.",
+        "description" : "You eat faster, and can eat and drink more, than anyone else!  You also enjoy food more; delicious food is better for your morale, and you don't mind unsavory meals as much.  Activate to skip prompt for overeating.",
         "starting_trait" : true,
-        "valid" : false
+        "valid" : false,
+        "active" : true
     },{
         "type" : "mutation",
         "id" : "NONADDICTIVE",
@@ -667,7 +668,7 @@
         "name" : "Lactose Intolerance",
         "points" : -1,
         "//" : "Actual digestive issue, on even footing with the -vore mutations.",
-        "description" : "You like 75 percent of the world, cannot tolerate milk or milk based products.  It's possible for you to eat them, but you will suffer morale penalties due to nausea.",
+        "description" : "You, like 75 percent of the world, cannot tolerate milk or milk based products.  It's possible for you to eat them, but you will suffer morale penalties due to nausea.",
         "starting_trait" : true
     },{
         "type" : "mutation",
@@ -2321,12 +2322,13 @@
         "id" : "EATHEALTH",
         "name" : "Hyper-Metabolism",
         "points" : 15,
-        "description" : "You metabolize nutrients so rapidly that you can convert food directly into useful tissue.  Excess nutrition will convert to HP, rather than being wasted.",
+        "description" : "You metabolize nutrients so rapidly that you can convert food directly into useful tissue.  Excess nutrition will convert to HP, rather than being wasted.  Activate to skip prompt for overeating.",
         "prereqs" : ["HUNGER3"],
         "cancels" : ["LIGHTEATER", "COLDBLOOD", "COLDBLOOD2", "COLDBLOOD3", "COLDBLOOD4"],
         "threshreq" : ["THRESH_CHIMERA"],
         "category" : ["MUTCAT_CHIMERA"],
-        "valid" : false
+        "valid" : false,
+        "active" : true
     },{
         "type" : "mutation",
         "id" : "HORNS",
@@ -3719,7 +3721,7 @@
         "name" : "Rapid Metabolism",
         "points" : -2,
         "valid" : false,
-        "description" : "You require more resources than most, but heal more rapidly as well.",
+        "description" : "You require more resources than most, but heal more rapidly as well.  Provides weak regeneration even when not asleep.",
         "cancels" : ["LIGHTEATER", "COLDBLOOD", "COLDBLOOD2", "COLDBLOOD3", "COLDBLOOD4", "FASTHEALER", "FASTHEALER2", "REGEN", "ROT1", "ROT2", "ROT3", "WAKEFUL", "WAKEFUL2", "WAKEFUL3"],
         "prereqs" : ["HUNGER"],
         "prereqs2" : ["SLEEPY"],
@@ -3794,7 +3796,7 @@
         "name" : "Weakening",
         "points" : -2,
         "bodytemp_modifiers" : [-250, -250],
-        "description" : "You feel as though you are slowly weakening, but it's so slight a feeling that it does not affect you at all.",
+        "description" : "You feel as though you are slowly weakening and your body heals slower.",
         "cancels" : ["FASTHEALER", "FASTHEALER2", "REGEN"],
         "changes_to" : ["ROT2"],
         "category" : ["MUTCAT_ELFA"]
@@ -5130,5 +5132,21 @@
         "points" : -1,
         "starting_trait" : true,
         "description" : "You can't even think about putting filthy clothes on yourself, especially from zombies' corpses."
+    },{
+        "type" : "mutation",
+        "id" : "BEE",
+        "name" : "Bee",
+        "points" : 0,
+        "valid" : false,
+        "description" : "NPC trait that makes monsters see it as a bee.  It is a bug (heh) if you have it.",
+        "threshold" : true
+    },{
+        "type" : "mutation",
+        "id" : "MUTE",
+        "name" : "mute",
+        "points" : 0,
+        "valid" : false,
+        "description" : "NPC trait that makes it impossible to say anything.  It is a bug if you have it.",
+        "threshold" : true
     }
 ]

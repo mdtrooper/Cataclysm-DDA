@@ -7,6 +7,7 @@
 
 #include <stdexcept>
 #include <algorithm>
+#include <cmath>
 
 std::string itype::nname( unsigned int const quantity ) const
 {

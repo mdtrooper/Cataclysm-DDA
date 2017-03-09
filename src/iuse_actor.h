@@ -1,3 +1,4 @@
+#pragma once
 #ifndef IUSE_ACTOR_H
 #define IUSE_ACTOR_H
 
@@ -8,6 +9,7 @@
 #include "string_id.h"
 #include "explosion.h"
 #include "vitamin.h"
+#include "units.h"
 #include <limits.h>
 
 struct vehicle_prototype;
@@ -26,6 +28,8 @@ using ammotype = string_id<ammunition_type>;
 using itype_id = std::string;
 class material_type;
 using material_id = string_id<material_type>;
+class emit;
+using emit_id = string_id<emit>;
 
 /**
  * Transform an item into a specific type.
@@ -76,7 +80,7 @@ class iuse_transform : public iuse_actor
         /** displayed if item is in player possession with %s replaced by item name */
         std::string need_charges_msg;
 
-        std::string menu_option_text;
+        std::string menu_text;
 
         iuse_transform( const std::string &type = "transform" ) : iuse_actor( type ) {}
 
@@ -450,7 +454,8 @@ class inscribe_actor : public iuse_actor
             material_id( "chitin" ),
             material_id( "iron" ),
             material_id( "steel" ),
-            material_id( "silver" )
+            material_id( "silver" ),
+            material_id( "bone" )
         };
 
         // How will the inscription be described
@@ -621,9 +626,9 @@ class holster_actor : public iuse_actor
         /** Message to show when holstering an item */
         std::string holster_msg;
         /** Maximum volume of each item that can be holstered */
-        int max_volume;
+        units::volume max_volume;
         /** Minimum volume of each item that can be holstered or 1/3 max_volume if unspecified */
-        int min_volume;
+        units::volume min_volume;
         /** Maximum weight of each item. If unspecified no weight limit is imposed */
         int max_weight = -1;
         /** Total number of items that holster can contain **/
@@ -647,6 +652,7 @@ class holster_actor : public iuse_actor
         void load( JsonObject &jo ) override;
         long use( player *, item *, bool, const tripoint & ) const override;
         iuse_actor *clone() const override;
+        void info( const item &, std::vector<iteminfo> & ) const override;
 };
 
 /**
@@ -760,6 +766,8 @@ class repair_item_actor : public iuse_actor
         void load( JsonObject &jo ) override;
         long use( player *, item *, bool, const tripoint & ) const override;
         iuse_actor *clone() const override;
+
+        std::string get_name() const override;
 };
 
 class heal_actor : public iuse_actor
@@ -860,6 +868,21 @@ class place_trap_actor : public iuse_actor
         void load( JsonObject &jo ) override;
         long use( player*, item*, bool, const tripoint & ) const override;
         iuse_actor *clone() const override;
+};
+
+class emit_actor : public iuse_actor
+{
+    public:
+        std::set<emit_id> emits;
+        /** If true multiplies the emits by number of charges on the item. */
+        bool scale_qty = false;
+
+        emit_actor( const std::string &type = "emit_actor" ) : iuse_actor( type ) {}
+        ~emit_actor() override { }
+        void load( JsonObject &jo ) override;
+        long use( player*, item*, bool, const tripoint & ) const override;
+        iuse_actor *clone() const override;
+        void finalize( const itype_id &my_item_type ) override;
 };
 
 #endif

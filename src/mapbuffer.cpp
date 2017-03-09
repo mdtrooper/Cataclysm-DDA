@@ -114,11 +114,14 @@ void mapbuffer::save( bool delete_after_save )
     // A set of already-saved submaps, in global overmap coordinates.
     std::set<tripoint> saved_submaps;
     std::list<tripoint> submaps_to_delete;
+    int next_report = 0;
     for( auto &elem : submaps ) {
-        if (num_total_submaps > 100 && num_saved_submaps % 100 == 0) {
+        if( num_total_submaps > 100 && num_saved_submaps >= next_report ) {
             popup_nowait(_("Please wait as the map saves [%d/%d]"),
                          num_saved_submaps, num_total_submaps);
+            next_report += std::max( 100, num_total_submaps / 20 );
         }
+
         // Whatever the coordinates of the current submap are,
         // we're saving a 2x2 quad of submaps at a time.
         // Submaps are generated in quads, so we know if we have one member of a quad,
@@ -400,7 +403,7 @@ submap *mapbuffer::unserialize_submaps( const tripoint &p )
               om_addr.x << "." << om_addr.y << "." << om_addr.z << ".map";
 
     using namespace std::placeholders;
-    if( !read_from_file_optional( quad_path.str(), std::bind( &mapbuffer::deserialize, this, _1 ) ) ) {
+    if( !read_from_file_optional_json( quad_path.str(), std::bind( &mapbuffer::deserialize, this, _1 ) ) ) {
         // If it doesn't exist, trigger generating it.
         return NULL;
     }

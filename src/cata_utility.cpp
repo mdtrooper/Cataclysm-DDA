@@ -11,68 +11,33 @@
 #include "output.h"
 #include "json.h"
 #include "filesystem.h"
+#include "item_search.h"
 
 #include <algorithm>
+#include <cmath>
+
+double round_up( double val, unsigned int dp )
+{
+    const double denominator = std::pow( 10.0, double( dp ) );
+    return std::ceil( denominator * val ) / denominator;
+}
 
 bool isBetween( int test, int down, int up )
 {
     return test > down && test < up;
 }
 
-bool lcmatch( const std::string &str, const std::string &findstr ); // ui.cpp
-bool list_items_match( const item *item, std::string sPattern )
+bool lcmatch( const std::string &str, const std::string &qry )
 {
-    size_t iPos;
-    bool hasExclude = false;
+    std::string needle;
+    needle.reserve( qry.size() );
+    std::transform( qry.begin(), qry.end(), std::back_inserter( needle ), tolower );
 
-    if( sPattern.find( "-" ) != std::string::npos ) {
-        hasExclude = true;
-    }
+    std::string haystack;
+    haystack.reserve( str.size() );
+    std::transform( str.begin(), str.end(), std::back_inserter( haystack ), tolower );
 
-    do {
-        iPos = sPattern.find( "," );
-        std::string pat = ( iPos == std::string::npos ) ? sPattern : sPattern.substr( 0, iPos );
-        bool exclude = false;
-        if( pat.substr( 0, 1 ) == "-" ) {
-            exclude = true;
-            pat = pat.substr( 1, pat.size() - 1 );
-        } else if( hasExclude ) {
-            hasExclude = false; //If there are non exclusive items to filter, we flip this back to false.
-        }
-
-        std::string namepat = pat;
-        std::transform( namepat.begin(), namepat.end(), namepat.begin(), tolower );
-        if( lcmatch( remove_color_tags( item->tname() ), namepat ) ) {
-            return !exclude;
-        }
-
-        if( pat.find( "{", 0 ) != std::string::npos ) {
-            std::string adv_pat_type = pat.substr( 1, pat.find( ":" ) - 1 );
-            std::string adv_pat_search = pat.substr( pat.find( ":" ) + 1,
-                                         ( pat.find( "}" ) - pat.find( ":" ) ) - 1 );
-            std::transform( adv_pat_search.begin(), adv_pat_search.end(), adv_pat_search.begin(), tolower );
-            if( adv_pat_type == "c" && lcmatch( item->get_category().name, adv_pat_search ) ) {
-                return !exclude;
-            } else if( adv_pat_type == "m" ) {
-                for( auto material : item->made_of_types() ) {
-                    if( lcmatch( material->name(), adv_pat_search ) ) {
-                        return !exclude;
-                    }
-                }
-            } else if( adv_pat_type == "dgt" && item->damage() > atoi( adv_pat_search.c_str() ) ) {
-                return !exclude;
-            } else if( adv_pat_type == "dlt" && item->damage() < atoi( adv_pat_search.c_str() ) ) {
-                return !exclude;
-            }
-        }
-
-        if( iPos != std::string::npos ) {
-            sPattern = sPattern.substr( iPos + 1, sPattern.size() );
-        }
-
-    } while( iPos != std::string::npos );
-
-    return hasExclude;
+    return haystack.find( needle ) != std::string::npos;
 }
 
 std::vector<map_item_stack> filter_item_stacks( std::vector<map_item_stack> stack,
@@ -81,12 +46,18 @@ std::vector<map_item_stack> filter_item_stacks( std::vector<map_item_stack> stac
     std::vector<map_item_stack> ret;
 
     std::string sFilterTemp = filter;
-
-    for( auto &elem : stack ) {
-        if( sFilterTemp == "" || list_items_match( elem.example, sFilterTemp ) ) {
-            ret.push_back( elem );
+    auto z = item_filter_from_string( filter );
+    std::copy_if( stack.begin(),
+                  stack.end(),
+                  std::back_inserter( ret ),
+    [z]( const map_item_stack & a ) {
+        if( a.example != nullptr ) {
+            return z( *a.example );
         }
+        return false;
     }
+                );
+
     return ret;
 }
 
@@ -95,8 +66,9 @@ int list_filter_high_priority( std::vector<map_item_stack> &stack, std::string p
 {
     //TODO:optimize if necessary
     std::vector<map_item_stack> tempstack; // temp
+    const auto filter_fn = item_filter_from_string( priorities );
     for( auto it = stack.begin(); it != stack.end(); ) {
-        if( priorities == "" || !list_items_match( it->example, priorities ) ) {
+        if( priorities.empty() || ( it->example != nullptr && !filter_fn( *it->example ) ) ) {
             tempstack.push_back( *it );
             it = stack.erase( it );
         } else {
@@ -116,8 +88,9 @@ int list_filter_low_priority( std::vector<map_item_stack> &stack, int start,
 {
     //TODO:optimize if necessary
     std::vector<map_item_stack> tempstack; // temp
+    const auto filter_fn = item_filter_from_string( priorities );
     for( auto it = stack.begin() + start; it != stack.end(); ) {
-        if( priorities != "" && list_items_match( it->example, priorities ) ) {
+        if( !priorities.empty() && it->example != nullptr && filter_fn( *it->example ) ) {
             tempstack.push_back( *it );
             it = stack.erase( it );
         } else {
@@ -132,9 +105,8 @@ int list_filter_low_priority( std::vector<map_item_stack> &stack, int start,
     return id;
 }
 
-// Operator overload required by sort interface.
 bool pair_greater_cmp::operator()( const std::pair<int, tripoint> &a,
-                                   const std::pair<int, tripoint> &b )
+                                   const std::pair<int, tripoint> &b ) const
 {
     return a.first > b.first;
 }
@@ -143,14 +115,11 @@ bool pair_greater_cmp::operator()( const std::pair<int, tripoint> &a,
 // This stuff could be moved elsewhere, but there
 // doesn't seem to be a good place to put it right now.
 
-// Basic logistic function.
 double logarithmic( double t )
 {
     return 1 / ( 1 + exp( -t ) );
 }
 
-// Logistic curve [-6,6], flipped and scaled to
-// range from 1 to 0 as pos goes from min to max.
 double logarithmic_range( int min, int max, int pos )
 {
     const double LOGI_CUTOFF = 4;
@@ -215,9 +184,30 @@ const char *weight_units()
     return get_option<std::string>( "USE_METRIC_WEIGHTS" ) == "lbs" ? _( "lbs" ) : _( "kg" );
 }
 
-/**
-* Convert internal velocity units to units defined by user
-*/
+const char *volume_units_abbr()
+{
+    const std::string vol_units = get_option<std::string>( "VOLUME_UNITS" );
+    if( vol_units == "c" ) {
+        return _( "c" );
+    } else if( vol_units == "l" ) {
+        return _( "L" );
+    } else {
+        return _( "qt" );
+    }
+}
+
+const char *volume_units_long()
+{
+    const std::string vol_units = get_option<std::string>( "VOLUME_UNITS" );
+    if( vol_units == "c" ) {
+        return _( "cup" );
+    } else if( vol_units == "l" ) {
+        return _( "liter" );
+    } else {
+        return _( "quart" );
+    }
+}
+
 double convert_velocity( int velocity, const units_type vel_units )
 {
     // internal units to mph conversion
@@ -238,9 +228,6 @@ double convert_velocity( int velocity, const units_type vel_units )
     return ret;
 }
 
-/**
-* Convert weight in grams to units defined by user (kg or lbs)
-*/
 double convert_weight( int weight )
 {
     double ret;
@@ -253,9 +240,68 @@ double convert_weight( int weight )
     return ret;
 }
 
+double convert_volume( int volume )
+{
+    return convert_volume( volume, NULL );
+}
+
+double convert_volume( int volume, int *out_scale )
+{
+    double ret = volume;
+    int scale = 0;
+    const std::string vol_units = get_option<std::string>( "VOLUME_UNITS" );
+    if( vol_units == "c" ) {
+        ret *= 0.004;
+        scale = 1;
+    } else if( vol_units == "l" ) {
+        ret *= 0.001;
+        scale = 2;
+    } else {
+        ret *= 0.00105669;
+        scale = 2;
+    }
+    if( out_scale != NULL ) {
+        *out_scale = scale;
+    }
+    return ret;
+}
+
 double temp_to_celsius( double fahrenheit )
 {
     return ( ( fahrenheit - 32.0 ) * 5.0 / 9.0 );
+}
+
+double clamp_to_width( double value, int width, int &scale )
+{
+    return clamp_to_width( value, width, scale, NULL );
+}
+
+double clamp_to_width( double value, int width, int &scale, bool *out_truncated )
+{
+    if( out_truncated != NULL ) {
+        *out_truncated = false;
+    }
+    if( value >= std::pow( 10.0, width ) ) {
+        // above the maximum number we can fit in the width without decimal
+        // show the bigest number we can without decimal
+        // flag as truncated
+        value = std::pow( 10.0, width ) - 1.0;
+        scale = 0;
+        if( out_truncated != NULL ) {
+            *out_truncated = true;
+        }
+    } else if( scale > 0 ) {
+        for( int s = 1; s <= scale; s++ ) {
+            int scale_width = 1 + s; // 1 decimal separator + "s"
+            if( width > scale_width && value >= std::pow( 10.0, width - scale_width ) ) {
+                // above the maximum number we can fit in the width with "s" decimals
+                // show this number with one less decimal than "s"
+                scale = s - 1;
+                break;
+            }
+        }
+    }
+    return value;
 }
 
 float multi_lerp( const std::vector<std::pair<float, float>> &points, float x )
@@ -355,6 +401,33 @@ bool write_to_file_exclusive( const std::string &path,
     }
 }
 
+std::istream &safe_getline( std::istream &ins, std::string &str )
+{
+    str.clear();
+    std::istream::sentry se( ins, true );
+    std::streambuf *sb = ins.rdbuf();
+
+    while( true ) {
+        int c = sb->sbumpc();
+        switch( c ) {
+            case '\n':
+                return ins;
+            case '\r':
+                if( sb->sgetc() == '\n' ) {
+                    sb->sbumpc();
+                }
+                return ins;
+            case EOF:
+                if( str.empty() ) {
+                    ins.setstate( std::ios::eofbit );
+                }
+                return ins;
+            default:
+                str += ( char )c;
+        }
+    }
+}
+
 bool read_from_file( const std::string &path, const std::function<void( std::istream & )> &reader )
 {
     try {
@@ -369,12 +442,12 @@ bool read_from_file( const std::string &path, const std::function<void( std::ist
         return true;
 
     } catch( const std::exception &err ) {
-        popup( _( "Failed to read from \"%1$s\": %2$s" ), path.c_str(), err.what() );
+        debugmsg( _( "Failed to read from \"%1$s\": %2$s" ), path.c_str(), err.what() );
         return false;
     }
 }
 
-bool read_from_file( const std::string &path, const std::function<void( JsonIn & )> &reader )
+bool read_from_file_json( const std::string &path, const std::function<void( JsonIn & )> &reader )
 {
     return read_from_file( path, [&reader]( std::istream & fin ) {
         JsonIn jsin( fin );
@@ -384,7 +457,7 @@ bool read_from_file( const std::string &path, const std::function<void( JsonIn &
 
 bool read_from_file( const std::string &path, JsonDeserializer &reader )
 {
-    return read_from_file( path, [&reader]( JsonIn & jsin ) {
+    return read_from_file_json( path, [&reader]( JsonIn & jsin ) {
         reader.deserialize( jsin );
     } );
 }
@@ -398,8 +471,8 @@ bool read_from_file_optional( const std::string &path,
     return file_exist( path ) && read_from_file( path, reader );
 }
 
-bool read_from_file_optional( const std::string &path,
-                              const std::function<void( JsonIn & )> &reader )
+bool read_from_file_optional_json( const std::string &path,
+                                   const std::function<void( JsonIn & )> &reader )
 {
     return read_from_file_optional( path, [&reader]( std::istream & fin ) {
         JsonIn jsin( fin );
@@ -409,7 +482,51 @@ bool read_from_file_optional( const std::string &path,
 
 bool read_from_file_optional( const std::string &path, JsonDeserializer &reader )
 {
-    return read_from_file_optional( path, [&reader]( JsonIn & jsin ) {
+    return read_from_file_optional_json( path, [&reader]( JsonIn & jsin ) {
         reader.deserialize( jsin );
     } );
+}
+
+std::string native_to_utf8( const std::string &str )
+{
+    if( !get_options().has_option( "ENCODING_CONV" ) || !get_option<bool>( "ENCODING_CONV" ) ) {
+        return str;
+    }
+#if defined(_WIN32) || defined(WINDOWS)
+    // native encoded string --> Unicode sequence --> UTF-8 string
+    int unicode_size = MultiByteToWideChar( CP_ACP, 0, str.c_str(), -1, NULL, 0 ) + 1;
+    std::wstring unicode( unicode_size, '\0' );
+    MultiByteToWideChar( CP_ACP, 0, str.c_str(), -1, &unicode[0], unicode_size );
+    int utf8_size = WideCharToMultiByte( CP_UTF8, 0, &unicode[0], -1, NULL, 0, NULL, 0 ) + 1;
+    std::string result( utf8_size, '\0' );
+    WideCharToMultiByte( CP_UTF8, 0, &unicode[0], -1, &result[0], utf8_size, NULL, 0 );
+    while( !result.empty() && result.back() == '\0' ) {
+        result.pop_back();
+    }
+    return result;
+#else
+    return str;
+#endif
+}
+
+std::string utf8_to_native( const std::string &str )
+{
+    if( !get_options().has_option( "ENCODING_CONV" ) || !get_option<bool>( "ENCODING_CONV" ) ) {
+        return str;
+    }
+#if defined(_WIN32) || defined(WINDOWS)
+    // UTF-8 string --> Unicode sequence --> native encoded string
+    int unicode_size = MultiByteToWideChar( CP_UTF8, 0, str.c_str(), -1, NULL, 0 ) + 1;
+    std::wstring unicode( unicode_size, '\0' );
+    MultiByteToWideChar( CP_UTF8, 0, str.c_str(), -1, &unicode[0], unicode_size );
+    int native_size = WideCharToMultiByte( CP_ACP, 0, &unicode[0], -1, NULL, 0, NULL, 0 ) + 1;
+    std::string result( native_size, '\0' );
+    WideCharToMultiByte( CP_ACP, 0, &unicode[0], -1, &result[0], native_size, NULL, 0 );
+    while( !result.empty() && result.back() == '\0' ) {
+        result.pop_back();
+    }
+    return result;
+#else
+    return str;
+#endif
 }

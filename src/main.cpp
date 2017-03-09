@@ -14,6 +14,7 @@
 #include "path_info.h"
 #include "mapsharing.h"
 #include "output.h"
+#include "main_menu.h"
 
 #include <cstring>
 #include <ctime>
@@ -63,6 +64,7 @@ int main(int argc, char *argv[])
     std::string dump;
     dump_mode dmode = dump_mode::TSV;
     std::vector<std::string> opts;
+    std::string world; /** if set try to load first save in this world on startup */
 
     // Set default file paths
 #ifdef PREFIX
@@ -144,6 +146,18 @@ int main(int argc, char *argv[])
                         }
                     }
                     return 0;
+                }
+            },
+            {
+                "--world", "<name>",
+                "Load world",
+                section_default,
+                [&world](int n, const char *params[]) -> int {
+                    if( n < 1 ) {
+                        return -1;
+                    }
+                    world = params[0];
+                    return 1;
                 }
             },
             {
@@ -392,11 +406,11 @@ int main(int argc, char *argv[])
         DebugLog(D_WARNING, D_MAIN) << "Error while setlocale(LC_ALL, '').";
     }
 
-    // Options strings loaded with system locale
+    // Options strings loaded with system locale. Even though set_language calls these, we
+    // need to call them from here too.
     get_options().init();
     get_options().load();
-
-    set_language(true);
+    set_language();
 
     // in test mode don't initialize curses to avoid escape sequences being inserted into output stream
     if( !test_mode ) {
@@ -460,20 +474,28 @@ int main(int argc, char *argv[])
     sigaction(SIGINT, &sigIntHandler, NULL);
 #endif
 
-    bool quit_game = false;
-    do {
-        if(!g->opening_screen()) {
-            quit_game = true;
+    while( true ) {
+        if( !world.empty() ) {
+            if( !g->load( world ) ) {
+                break;
+            }
+            world.clear(); // ensure quit returns to opening screen
+
+        } else {
+            main_menu menu;
+            if( !menu.opening_screen() ) {
+                break;
+            }
         }
-        while (!quit_game && !g->do_turn()) ;
-        if (g->game_quit() || g->game_error()) {
-            quit_game = true;
+
+        while( !g->do_turn() );
+        if( g->game_error() ) {
+            break;
         }
-    } while (!quit_game);
+    };
 
 
     exit_handler(-999);
-
     return 0;
 }
 
@@ -500,7 +522,7 @@ void printHelpMessage(const arg_handler *first_pass_arguments,
         help_map.insert( std::make_pair(help_group, &second_pass_arguments[i]) );
     }
 
-    printf("Command line paramters:\n");
+    printf("Command line parameters:\n");
     std::string current_help_group;
     auto it = help_map.begin();
     auto it_end = help_map.end();
@@ -525,6 +547,8 @@ void printHelpMessage(const arg_handler *first_pass_arguments,
 
 void exit_handler(int s)
 {
+    const int old_timeout = inp_mngr.get_timeout();
+    inp_mngr.reset_timeout();
     if (s != 2 || query_yn(_("Really Quit? All unsaved changes will be lost."))) {
         erase(); // Clear screen
 
@@ -542,4 +566,5 @@ void exit_handler(int s)
 
         exit( exit_status );
     }
+    inp_mngr.set_timeout( old_timeout );
 }

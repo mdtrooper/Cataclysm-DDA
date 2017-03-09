@@ -14,14 +14,10 @@
     "ranged_damage": 22,
     "pierce": 15,
     "dispersion": 30,
-    "sight_dispersion": 150,
     "durability": 10,
+    "loudness": 12,
     "reload": 500,
-    "ammo_effects": [
-      "PLASMA",
-      "EXPLOSIVE",
-      "FLAME"
-    ],
+    "ammo_effects": [ "PLASMA", "EXPLOSIVE", "FLAME" ],
     "flags": [ "NEVER_JAMS", "TRADER_AVOID" ]
   },
   {
@@ -39,13 +35,10 @@
     "ranged_damage": 10,
     "pierce": 15,
     "dispersion": 10,
-    "sight_dispersion": 150,
     "durability": 10,
+    "loudness": 7,
     "reload": 500,
-    "ammo_effects": [
-      "LASER",
-      "INCENDIARY"
-    ],
+    "ammo_effects": [ "LASER", "INCENDIARY" ],
     "flags": [ "NEVER_JAMS", "TRADER_AVOID" ]
   },
   {
@@ -62,13 +55,10 @@
     "range": 10,
     "ranged_damage": 16,
     "dispersion": 10,
-    "sight_dispersion": 150,
     "durability": 10,
+    "loudness": 10,
     "reload": 500,
-    "ammo_effects": [
-      "LIGHTNING",
-      "BOUNCE"
-    ],
+    "ammo_effects": [ "LIGHTNING", "BOUNCE" ],
     "flags": [ "NEVER_JAMS", "TRADER_AVOID" ]
   }
 ]

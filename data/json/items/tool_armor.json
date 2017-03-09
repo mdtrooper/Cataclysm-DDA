@@ -1,11 +1,5 @@
 [
     {
-        "type" : "ITEM_CATEGORY",
-        "id" : "armor",
-        "name" : "ARMOR",
-        "sort_rank" : 20
-    },
-    {
         "id": "miner_hat",
         "type": "TOOL_ARMOR",
         "category" : "armor",
@@ -76,13 +70,11 @@
         "name" : "game watch",
         "name_plural" : "game watches",
         "volume" : 1,
-        "material_thickness" : 0,
         "description" : "A waterproof digital watch with a built-in electronic game system, powered by standard batteries.  Activate to play.",
         "weight" : 112,
         "to_hit" : -1,
         "color" : "light_gray",
         "covers" : ["HAND_EITHER"],
-        "encumbrance" : 0,
         "price" : 6000,
         "material" : ["plastic"],
         "flags" : ["WATCH", "WATER_FRIENDLY", "BELTED", "FRAGILE", "ALLOWS_NATURAL_ATTACKS"],
@@ -145,7 +137,6 @@
         },
         "covers" : ["FEET"],
         "warmth" : 10,
-        "encumbrance" : 0,
         "coverage" : 100,
         "material_thickness" : 1
     },
@@ -175,7 +166,6 @@
         },
         "covers" : ["FEET"],
         "warmth" : 60,
-        "encumbrance" : 0,
         "coverage" : 100,
         "material_thickness" : 1
     },
@@ -206,7 +196,6 @@
         },
         "covers" : ["TORSO", "ARMS", "LEGS"],
         "warmth" : 10,
-        "encumbrance" : 0,
         "coverage" : 100,
         "material_thickness" : 1
     },
@@ -236,7 +225,6 @@
         },
         "covers" : ["TORSO", "ARMS", "LEGS"],
         "warmth" : 60,
-        "encumbrance" : 0,
         "coverage" : 100,
         "material_thickness" : 1
     },
@@ -268,7 +256,6 @@
         },
         "covers" : ["HANDS"],
         "warmth" : 10,
-        "encumbrance" : 0,
         "coverage" : 100,
         "material_thickness" : 1
     },
@@ -298,7 +285,6 @@
         },
         "covers" : ["HANDS"],
         "warmth" : 60,
-        "encumbrance" : 0,
         "coverage" : 100,
         "material_thickness" : 1
     },
@@ -329,7 +315,6 @@
         },
         "covers" : ["HEAD", "MOUTH"],
         "warmth" : 10,
-        "encumbrance" : 0,
         "coverage" : 100,
         "material_thickness" : 1
     },
@@ -359,7 +344,6 @@
         },
         "covers" : ["HEAD", "MOUTH"],
         "warmth" : 60,
-        "encumbrance" : 0,
         "coverage" : 100,
         "material_thickness" : 1
     },
@@ -417,7 +401,6 @@
             "need_charges_msg": "The head torch batteries are dead."
         },
         "covers" : ["HEAD"],
-        "encumbrance" : 0,
         "coverage" : 15,
         "material_thickness" : 1
     },
@@ -447,7 +430,6 @@
             "target": "wearable_light"
         },
         "covers" : ["HEAD"],
-        "encumbrance" : 0,
         "coverage" : 15,
         "material_thickness" : 1
     },
@@ -478,7 +460,6 @@
             "need_charges_msg": "The survivor head torch batteries are dead."
         },
         "covers" : ["HEAD"],
-        "encumbrance" : 0,
         "coverage" : 20,
         "material_thickness" : 1
     },
@@ -508,7 +489,6 @@
             "target": "survivor_light"
         },
         "covers" : ["HEAD"],
-        "encumbrance" : 0,
         "coverage" : 20,
         "material_thickness" : 1
     },
@@ -613,7 +593,7 @@
         "name": "RM13 combat armor (on)",
         "name_plural": "RM13 combat armors (on)",
         "description": "Internally powered by a maximum of ten plutonium fuel cells, this full-body suit of sleek black military armor represents the pinnacle of Rivtech's non-rigid powered armor technology.  It is turned on, and continually draining power.  Use it to turn it off.",
-        "flags" : ["VARSIZE", "STURDY", "WATERPROOF", "RAINPROOF", "WATCH", "ALARMCLOCK", "SWIM_GOGGLES", "SUN_GLASSES", "RAD_PROOF", "ELECTRIC_IMMUNE", "TRADER_AVOID"],
+        "flags" : ["VARSIZE", "STURDY", "WATERPROOF", "RAINPROOF", "WATCH", "ALARMCLOCK", "SWIM_GOGGLES", "SUN_GLASSES", "RAD_PROOF", "ELECTRIC_IMMUNE", "THERMOMETER", "TRADER_AVOID"],
         "price": 50000000,
         "material": ["ceramic", "kevlar"],
         "weight" : 6820,
@@ -910,8 +890,6 @@
         "charges_per_use": 1,
         "ammo": "ampoule",
         "use_action": "JET_INJECTOR",
-        "encumbrance" : 0,
-        "coverage" : 0,
         "material_thickness" : 3
     },
     {
@@ -933,8 +911,6 @@
         "charges_per_use": 1,
         "ammo": "stimpack_ammo",
         "use_action": "STIMPACK",
-        "encumbrance" : 0,
-        "coverage" : 0,
         "material_thickness" : 3
     },
     {
@@ -1074,10 +1050,7 @@
         "material": "plastic",
         "weight": 280,
         "volume": 1,
-        "use_action": "UNPACK_ITEM",
-        "encumbrance" : 0,
-        "coverage" : 0,
-        "material_thickness" : 0
+        "use_action": "UNPACK_ITEM"
     },
     {
         "id": "folding_poncho_on",
@@ -1097,7 +1070,6 @@
         "covers" : ["TORSO", "ARMS"],
         "flags" : ["WATERPROOF", "RAINPROOF", "HOOD", "OVERSIZE", "OUTER"],
         "environmental_protection" : 1,
-        "encumbrance" : 0,
         "coverage" : 90,
         "material_thickness" : 1
     },
@@ -1112,10 +1084,7 @@
         "material": "plastic",
         "weight": 622,
         "volume": 2,
-        "use_action": "UNPACK_ITEM",
-        "encumbrance" : 0,
-        "coverage" : 0,
-        "material_thickness" : 0
+        "use_action": "UNPACK_ITEM"
     },
     {
         "id": "emer_blanket_on",
@@ -1158,8 +1127,6 @@
         "charges_per_use": 1,
         "ammo": "battery",
         "use_action": "RADGLOVE",
-        "encumbrance" : 0,
-        "coverage" : 0,
         "material_thickness" : 1
     },
     {
@@ -1175,7 +1142,6 @@
         "price" : 50000,
         "material" : ["leather", "iron"],
         "volume" : 16,
-        "encumbrance" : 0,
         "flags" : ["VARSIZE", "WATER_FRIENDLY", "STURDY", "WAIST", "OVERSIZE"],
         "coverage" : 15,
         "material_thickness" : 2,
@@ -1186,7 +1152,7 @@
             "draw_cost": 3,
             "max_volume": 4,
             "flags": [ "SHEATH_KNIFE", "SHEATH_SWORD" ]
-        }, "HAMMER" ],
+        } ],
         "qualities": [["HAMMER", 3], ["SAW_M", 2], ["SAW_W", 2], ["WRENCH", 2],
         ["SCREW", 1], ["HAMMER_FINE", 1], ["SAW_M_FINE", 1], ["WRENCH_FINE", 1], ["SCREW_FINE", 1]]
     },
@@ -1204,10 +1170,7 @@
         "use_action": {
             "type": "picklock",
             "pick_quality": 3
-        },
-        "encumbrance" : 0,
-        "coverage" : 0,
-        "material_thickness" : 0
+        }
     },
     {
         "id" : "fc_hairpin",
@@ -1224,10 +1187,6 @@
             "type": "picklock",
             "pick_quality": 1
         },
-        "encumbrance" : 0,
-        "coverage" : 0,
-        "material_thickness" : 0,
-        "warmth" : 0,
         "flags" : ["FANCY"]
     },
   {
@@ -1245,7 +1204,6 @@
     "to_hit": -1,
     "use_action": "TOWEL",
     "warmth" : 10,
-    "encumbrance" : 0,
     "coverage" : 50,
     "material_thickness" : 1
   },
@@ -1265,8 +1223,6 @@
     "revert_to": "towel",
     "use_action": "TOWEL",
     "flags": ["WET"],
-    "warmth" : 0,
-    "encumbrance" : 0,
     "coverage" : 50,
     "material_thickness" : 1
   },{
@@ -1285,8 +1241,6 @@
     "revert_to": "towel",
     "use_action": "TOWEL",
     "flags": ["WET"],
-    "warmth" : 0,
-    "encumbrance" : 0,
     "coverage" : 50,
     "material_thickness" : 1
   },
@@ -1331,7 +1285,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You loosen your %s.",
-            "target": "patchwork_scarf_loose"
+            "target": "patchwork_scarf_loose",
+            "menu_text": "Loosen"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OUTER"],
@@ -1359,7 +1314,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You wrap your scarf tighter.",
-            "target": "patchwork_scarf"
+            "target": "patchwork_scarf",
+            "menu_text": "Wrap tighter"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OUTER", "ALLOWS_NATURAL_ATTACKS"],
@@ -1386,7 +1342,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You loosen your %s.",
-            "target": "long_patchwork_scarf_loose"
+            "target": "long_patchwork_scarf_loose",
+            "menu_text": "Loosen"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OVERSIZE", "POCKETS", "OUTER"],
@@ -1413,7 +1370,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You wrap your scarf tighter.",
-            "target": "long_patchwork_scarf"
+            "target": "long_patchwork_scarf",
+            "menu_text": "Wrap tighter"
         },
         "revert_to": "long_patchwork_scarf",
         "covers" : ["MOUTH"],
@@ -1441,7 +1399,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You loosen your %s.",
-            "target": "knit_scarf_loose"
+            "target": "knit_scarf_loose",
+            "menu_text": "Loosen"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OUTER"],
@@ -1469,7 +1428,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You wrap your scarf tighter.",
-            "target": "knit_scarf"
+            "target": "knit_scarf",
+            "menu_text": "Wrap tighter"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OUTER", "ALLOWS_NATURAL_ATTACKS"],
@@ -1496,7 +1456,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You loosen your %s.",
-            "target": "long_knit_scarf_loose"
+            "target": "long_knit_scarf_loose",
+            "menu_text": "Loosen"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OVERSIZE", "POCKETS", "OUTER"],
@@ -1523,7 +1484,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You wrap your scarf tighter.",
-            "target": "long_knit_scarf"
+            "target": "long_knit_scarf",
+            "menu_text": "Wrap tighter"
         },
         "revert_to": "long_knit_scarf",
         "covers" : ["MOUTH"],
@@ -1551,7 +1513,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You loosen your %s.",
-            "target": "scarf_loose"
+            "target": "scarf_loose",
+            "menu_text": "Loosen"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OUTER"],
@@ -1579,7 +1542,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You wrap your scarf a bit tighter.",
-            "target": "scarf"
+            "target": "scarf",
+            "menu_text": "Wrap tighter"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OUTER", "ALLOWS_NATURAL_ATTACKS"],
@@ -1606,7 +1570,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You loosen your %s.",
-            "target": "scarf_long_loose"
+            "target": "scarf_long_loose",
+            "menu_text": "Loosen"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OVERSIZE", "POCKETS", "OUTER"],
@@ -1633,7 +1598,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You wrap your scarf tighter.",
-            "target": "scarf_long"
+            "target": "scarf_long",
+            "menu_text": "Wrap tighter"
         },
         "revert_to": "scarf_long",
         "covers" : ["MOUTH"],
@@ -1661,7 +1627,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You loosen your %s.",
-            "target": "scarf_fur_loose"
+            "target": "scarf_fur_loose",
+            "menu_text": "Loosen"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OUTER"],
@@ -1689,7 +1656,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You wrap your scarf a bit tighter.",
-            "target": "scarf_fur"
+            "target": "scarf_fur",
+            "menu_text": "Wrap tighter"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OUTER", "ALLOWS_NATURAL_ATTACKS"],
@@ -1716,7 +1684,8 @@
         "use_action": {
             "type": "transform",
             "msg": "You loosen your %s.",
-            "target": "scarf_fur_long_loose"
+            "target": "scarf_fur_long_loose",
+            "menu_text": "Loosen"
         },
         "covers" : ["MOUTH"],
         "flags" : ["OVERSIZE", "POCKETS", "OUTER"],
@@ -1743,14 +1712,14 @@
         "use_action": {
             "type": "transform",
             "msg": "You wrap your scarf tighter.",
-            "target": "scarf_fur_long"
+            "target": "scarf_fur_long",
+            "menu_text": "Wrap tighter"
         },
         "revert_to": "scarf_fur_long",
         "covers" : ["MOUTH"],
         "flags" : ["OVERSIZE", "POCKETS", "OUTER", "ALLOWS_NATURAL_ATTACKS"],
         "warmth" : 35,
         "environmental_protection" : 2,
-        "encumbrance" : 0,
         "coverage" : 45,
         "material_thickness" : 3
     },
@@ -1782,7 +1751,6 @@
         },
         "covers" : ["HEAD", "MOUTH", "TORSO", "ARMS", "LEGS", "HANDS", "FEET"],
         "warmth" : 10,
-        "encumbrance" : 0,
         "coverage" : 100,
         "material_thickness" : 1
     },
@@ -1812,7 +1780,6 @@
         },
         "covers" : ["HEAD", "MOUTH", "TORSO", "ARMS", "LEGS", "HANDS", "FEET"],
         "warmth" : 60,
-        "encumbrance" : 0,
         "coverage" : 100,
         "material_thickness" : 1
     },
@@ -1871,12 +1838,10 @@
         "id" : "whistle",
         "name" : "whistle",
         "volume" : 1,
-        "material_thickness" : 0,
         "description" : "A simple metal whistle, with a cord to wear it around your neck.",
         "weight" : 25,
         "to_hit" : -1,
         "color" : "light_gray",
-        "encumbrance" : 0,
         "price" : 200,
         "material" : ["steel", "cotton"],
         "flags" : ["WATER_FRIENDLY"],
@@ -1919,9 +1884,7 @@
         "price" : 1000,
         "material" : ["steel"],
         "volume" : 1,
-        "encumbrance" : 0,
         "flags" : ["BELTED"],
-        "coverage" : 0,
         "material_thickness" : 1
     },
     {
@@ -2129,5 +2092,21 @@
         "encumbrance" : 5,
         "coverage" : 10,
         "material_thickness" : 2
+    },
+    {
+    "id": "stethoscope",
+    "type": "TOOL_ARMOR",
+    "symbol": "y",
+    "color": "dark_gray",
+    "name": "stethoscope",
+    "description": "This is a medical listening tool.  Use it to listen to things.  Closely.",
+    "price": 4000,
+    "material": ["plastic", "aluminum"],
+    "weight": 150,
+    "volume": 1,
+        "covers" : ["TORSO"],
+        "encumbrance" : 1,
+        "flags" : ["BELTED"],
+        "coverage" : 5
     }
 ]
