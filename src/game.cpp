@@ -4991,10 +4991,10 @@ void game::draw_sidebar()
     if( safe_mode != SAFE_MODE_OFF || get_option<bool>( "AUTOSAFEMODE" ) ) {
         int iPercent = turnssincelastmon * 100 / get_option<int>( "AUTOSAFEMODETURNS" );
         wmove(w_status, sideStyle ? 4 : 1, getmaxx(w_status) - 4);
-        const char *letters[] = { "S", "A", "F", "E" };
+        const std::array<std::string, 4> letters = {{ "S", "A", "F", "E" }};
         for (int i = 0; i < 4; i++) {
             nc_color c = (safe_mode == SAFE_MODE_OFF && iPercent < (i + 1) * 25) ? c_red : c_green;
-            wprintz(w_status, c, letters[i]);
+            wprintz(w_status, c, letters[i].c_str());
         }
     }
     wrefresh(w_status);
@@ -5212,21 +5212,21 @@ void game::draw_HP()
         }
     }
 
-    static const char *body_parts[] = { _("HEAD"), _("TORSO"), _("L ARM"),
-                                        _("R ARM"), _("L LEG"), _("R LEG"),
-                                        _("POWER")
-                                      };
-    static body_part part[] = { bp_head, bp_torso, bp_arm_l,
-                                bp_arm_r, bp_leg_l, bp_leg_r, num_bp
-                              };
-    int num_parts = sizeof(body_parts) / sizeof(body_parts[0]);
-    for (int i = 0; i < num_parts; i++) {
-        const char *str = body_parts[i];
+    const size_t num_parts = 7;
+    static const std::array<std::string, num_parts> body_parts = {{
+        _("HEAD"), _("TORSO"), _("L ARM"),
+        _("R ARM"), _("L LEG"), _("R LEG"), _("POWER")
+    }};
+    static std::array<body_part, num_parts> part = {{
+        bp_head, bp_torso, bp_arm_l, bp_arm_r, bp_leg_l, bp_leg_r, num_bp
+    }};
+    for (size_t i = 0; i < num_parts; i++) {
+        const std::string &str = body_parts[i];
         wmove(w_HP, i * dy, 0);
         if (wide) {
             wprintz(w_HP, u.limb_color(part[i], true, true, true), " ");
         }
-        wprintz(w_HP, u.limb_color(part[i], true, true, true), str);
+        wprintz(w_HP, u.limb_color(part[i], true, true, true), str.c_str());
         if (!wide) {
             wprintz(w_HP, u.limb_color(part[i], true, true, true), ":");
         }
@@ -5774,16 +5774,16 @@ int game::mon_info(WINDOW *w)
     // 6 8 2    0-7 are provide by direction_from()
     // 5 4 3    8 is used for local monsters (for when we explain them below)
 
-    const char *dir_labels[] = {
+    const std::array<std::string, 8> dir_labels = {{
         _("North:"), _("NE:"), _("East:"), _("SE:"),
         _("South:"), _("SW:"), _("West:"), _("NW:")
-    };
-    int widths[8];
+    }};
+    std::array<int, 8> widths;
     for (int i = 0; i < 8; i++) {
-        widths[i] = utf8_width(dir_labels[i]);
+        widths[i] = utf8_width(dir_labels[i].c_str());
     }
-    int xcoords[8];
-    const int ycoords[] = { 0, 0, 1, 2, 2, 2, 1, 0 };
+    std::array<int, 8> xcoords;
+    const std::array<int, 8> ycoords = {{ 0, 0, 1, 2, 2, 2, 1, 0 }};
     xcoords[0] = xcoords[4] = width / 3;
     xcoords[1] = xcoords[3] = xcoords[2] = (width / 3) * 2;
     xcoords[5] = xcoords[6] = xcoords[7] = 0;
@@ -5792,7 +5792,7 @@ int game::mon_info(WINDOW *w)
     for (int i = 0; i < 8; i++) {
         nc_color c = unique_types[i].empty() && unique_mons[i].empty() ? c_dkgray
                      : (dangerous[i] ? c_ltred : c_ltgray);
-        mvwprintz(w, ycoords[i] + startrow, xcoords[i], c, dir_labels[i]);
+        mvwprintz(w, ycoords[i] + startrow, xcoords[i], c, dir_labels[i].c_str());
     }
 
     // Print the symbols of all monsters in all directions.
@@ -6258,13 +6258,13 @@ void game::knockback( std::vector<tripoint> &traj, int force, int stun, int dam_
                     if (targ->has_effect( effect_stunned))
                         add_msg(_("%s was stunned!"), targ->name.c_str());
 
-                    body_part bps[] = {
+                    std::array<body_part, 8> bps = {{
                         bp_head,
                         bp_arm_l, bp_arm_r,
                         bp_hand_l, bp_hand_r,
                         bp_torso,
                         bp_leg_l, bp_leg_r
-                    };
+                    }};
                     for (auto &bp : bps) {
                         if (one_in(2)) {
                             targ->deal_damage( nullptr, bp, damage_instance( DT_BASH, force_remaining * dam_mult ) );
@@ -6333,13 +6333,13 @@ void game::knockback( std::vector<tripoint> &traj, int force, int stun, int dam_
                                 force_remaining);
                     }
                     u.add_effect( effect_stunned, force_remaining);
-                    body_part bps[] = {
+                    std::array<body_part, 8> bps = {{
                         bp_head,
                         bp_arm_l, bp_arm_r,
                         bp_hand_l, bp_hand_r,
                         bp_torso,
                         bp_leg_l, bp_leg_r
-                    };
+                    }};
                     for (auto &bp : bps) {
                         if (one_in(2)) {
                             u.deal_damage( nullptr, bp, damage_instance( DT_BASH, force_remaining * dam_mult ) );
@@ -10851,24 +10851,40 @@ void game::wield( int pos )
         add_msg( m_info, _( "You cannot unwield your %s." ), u.weapon.tname().c_str() );
         return;
     }
-    if( pos == INT_MIN ) {
-        pos = inv_for_all( _( "Wield item" ), _( "You have nothing to wield." ) );
+
+    item_location loc;
+    if( pos != INT_MIN ) {
+        loc = std::move( item_location( u, &u.i_at( pos ) ) );
+    } else {
+        const auto filter = []( const item &it ) {
+            return it.made_of( SOLID );
+        };
+        loc = std::move( inv_map_splice( filter, _( "Wield item" ), 1,
+                                         _( "You have nothing to wield." ) ) );
     }
 
-    if( pos == INT_MIN ) {
+    if( !loc ) {
         add_msg( _( "Never mind." ) );
         return;
     }
 
+    // Minor hack: special case owned weapons here
+    // @todo Move that to player::wield
+    bool in_inv = loc.where() == item_location::type::character;
+
     // Weapons need invlets to access, give one if not already assigned.
-    item &it = u.i_at( pos );
+    item &it = *loc;
     if( !it.is_null() && it.invlet == 0 ) {
         u.inv.assign_empty_invlet( it, true );
     }
 
     // If called for the current weapon then try unwielding it
-    if( u.wield( pos == -1 ? u.ret_null : it ) ) {
+    if( u.wield( &it == &u.weapon ? u.ret_null : it ) ) {
         u.recoil = MIN_RECOIL;
+        // Rest of the hack: remove the item if it wasn't removed in player::wield
+        if( !in_inv ) {
+            loc.remove_item();
+        }
     }
 }
 
