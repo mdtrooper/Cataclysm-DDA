@@ -2,16 +2,15 @@
 #ifndef COLOR_LOADER_H
 #define COLOR_LOADER_H
 
-#include "json.h"
-#include "debug.h"
-#include "cata_utility.h"
-#include "filesystem.h"
-#include "path_info.h"
-
-#include <map>
-#include <string>
 #include <array>
 #include <fstream>
+#include <map>
+#include <string>
+
+#include "debug.h"
+#include "filesystem.h"
+#include "json.h"
+#include "path_info.h"
 
 template<typename ColorType>
 class color_loader
@@ -59,7 +58,9 @@ class color_loader
             }
         }
 
-        void load_throws( std::array<ColorType, COLOR_NAMES_COUNT> &windowsPalette ) {
+    public:
+        /// @throws std::exception upon any kind of error.
+        void load( std::array<ColorType, COLOR_NAMES_COUNT> &windowsPalette ) {
             const std::string default_path = FILENAMES["colors"];
             const std::string custom_path = FILENAMES["base_colors"];
 
@@ -72,24 +73,13 @@ class color_loader
             } catch( const JsonError &err ) {
                 DebugLog( D_ERROR, D_SDL ) << "Failed to load color data from " << custom_path << ": " <<
                                            err.what();
+
+                // this should succeed, otherwise the installation is botched
+                load_colorfile( default_path );
             }
-            // this should succeed, otherwise the installation is botched
-            load_colorfile( default_path );
 
             for( size_t c = 0; c < main_color_names().size(); c++ ) {
                 windowsPalette[c] = ccolor( main_color_names()[c] );
-            }
-        }
-
-    public:
-        // does not throw anything
-        bool load( std::array<ColorType, COLOR_NAMES_COUNT> &windowsPalette ) {
-            try {
-                load_throws( windowsPalette );
-                return true;
-            } catch( const JsonError &err ) {
-                DebugLog( D_ERROR, D_SDL ) << "Failed to load color data: " << err.what();
-                return false;
             }
         }
 };

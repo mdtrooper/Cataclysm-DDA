@@ -1,27 +1,25 @@
 #pragma once
-#ifndef H_GENERIC_FACTORY
-#define H_GENERIC_FACTORY
+#ifndef GENERIC_FACTORY_H
+#define GENERIC_FACTORY_H
 
-#include "string_id.h"
-#include "int_id.h"
-#include "init.h"
+#include <algorithm>
+#include <bitset>
+#include <set>
+#include <unordered_map>
+#include <vector>
 
+#include "assign.h"
+#include "catacharset.h"
 #include "debug.h"
+#include "enum_bitset.h"
+#include "init.h"
+#include "int_id.h"
 #include "json.h"
-#include "color.h"
+#include "output.h"
+#include "string_id.h"
 #include "translations.h"
 #include "units.h"
-#include "assign.h"
-
-#include <string>
-#include <unordered_map>
-#include <bitset>
-#include <map>
-#include <set>
-#include <string>
-#include <vector>
-#include <algorithm>
-#include <sstream>
+#include "wcwidth.h"
 
 /**
 A generic class to store objects identified by a `string_id`.
@@ -117,6 +115,10 @@ class string_id_reader;
 template<typename T>
 class generic_factory
 {
+
+    public:
+        virtual ~generic_factory() = default;
+
     private:
         DynamicDataLoader::deferred_json deferred;
 
@@ -177,6 +179,49 @@ class generic_factory
               alias_member_name( alias_member_name ),
               dummy_obj() {
         }
+
+        /**
+        * Perform JSON inheritance handling for `T def` and returns true if JsonObject is real.
+        *
+        * If the object contains a "copy-from" member the corresponding abstract gets copied if found.
+        *    If abstract is not found, object is added to deferred.
+        * If the object is abstract, it is loaded via `T::load` and added to `abstracts`
+        *
+        * @return true if `jo` is loaded and false if loading is deferred.
+        * @throws JsonError If `jo` is both abstract and real. (contains "abstract" and "id" members)
+        */
+        bool handle_inheritance( T &def, JsonObject &jo, const std::string &src ) {
+            static const std::string copy_from( "copy-from" );
+            if( jo.has_string( copy_from ) ) {
+                const std::string source = jo.get_string( copy_from );
+                auto base = map.find( string_id<T>( source ) );
+
+                if( base != map.end() ) {
+                    def = obj( base->second );
+                } else {
+                    auto ab = abstracts.find( source );
+
+                    if( ab != abstracts.end() ) {
+                        def = ab->second;
+                    } else {
+                        def.was_loaded = false;
+                        deferred.emplace_back( jo.str(), src );
+                        return false;
+                    }
+                }
+                def.was_loaded = true;
+            }
+
+            if( jo.has_string( "abstract" ) ) {
+                if( jo.has_string( "id" ) ) {
+                    jo.throw_error( "cannot specify both 'abstract' and 'id'" );
+                }
+                def.load( jo, src );
+                abstracts[jo.get_string( "abstract" )] = def;
+            }
+            return true;
+        }
+
         /**
          * Load an object of type T with the data from the given JSON object.
          *
@@ -191,27 +236,9 @@ class generic_factory
 
             T def;
 
-            static const std::string copy_from( "copy-from" );
-            if( jo.has_string( copy_from ) ) {
-                const std::string source = jo.get_string( copy_from );
-                auto base = map.find( string_id<T>( source ) );
-
-                if( base != map.end() ) {
-                    def = obj( base->second );
-                } else {
-                    auto ab = abstracts.find( source );
-
-                    if( ab != abstracts.end() ) {
-                        def = ab->second;
-                    } else {
-                        deferred.emplace_back( jo.str(), src );
-                        return;
-                    }
-                }
-
-                def.was_loaded = true;
+            if( !handle_inheritance( def, jo, src ) ) {
+                return;
             }
-
             if( jo.has_string( id_member_name ) ) {
                 def.id = string_id<T>( jo.get_string( id_member_name ) );
                 def.load( jo, src );
@@ -227,11 +254,7 @@ class generic_factory
                     }
                 }
 
-            } else if( jo.has_string( "abstract" ) ) {
-                def.load( jo, src );
-                abstracts[jo.get_string( "abstract" )] = def;
-
-            } else {
+            } else if( !jo.has_string( "abstract" ) ) {
                 jo.throw_error( "must specify either id or abstract" );
             }
         }
@@ -315,7 +338,7 @@ class generic_factory
          */
         const T &obj( const int_id<T> &id ) const {
             if( !is_valid( id ) ) {
-                debugmsg( "invalid %s id \"%d\"", type_name.c_str(), id );
+                debugmsg( "invalid %s id \"%d\"", type_name, id.to_i() );
                 return dummy_obj;
             }
             return list[id];
@@ -330,7 +353,7 @@ class generic_factory
         const T &obj( const string_id<T> &id ) const {
             int_id<T> i_id;
             if( !find_id( id, i_id ) ) {
-                debugmsg( "invalid %s id \"%s\"", type_name.c_str(), id.c_str() );
+                debugmsg( "invalid %s id \"%s\"", type_name, id.c_str() );
                 return dummy_obj;
             }
             return list[i_id];
@@ -358,7 +381,7 @@ class generic_factory
             if( find_id( id, result ) ) {
                 return result;
             }
-            debugmsg( "invalid %s id \"%s\"", type_name.c_str(), id.c_str() );
+            debugmsg( "invalid %s id \"%s\"", type_name, id.c_str() );
             return null_id;
         }
         /**
@@ -421,7 +444,6 @@ class Dummy2 {
     nc_color c;
     void load(JsonObject &jo) {
         mandatory(jo, was_loaded, "b", b); // uses JsonIn::read(int&)
-        mandatory(jo, was_loaded, "c", c, color_reader);
     }
 };
 \endcode
@@ -451,7 +473,11 @@ inline void mandatory( JsonObject &jo, const bool was_loaded, const std::string 
 {
     if( !jo.read( name, member ) ) {
         if( !was_loaded ) {
-            jo.throw_error( "missing mandatory member \"" + name + "\"" );
+            if( jo.has_member( name ) ) {
+                jo.throw_error( "failed to read mandatory member \"" + name + "\"" );
+            } else {
+                jo.throw_error( "missing mandatory member \"" + name + "\"" );
+            }
         }
     }
 }
@@ -461,7 +487,11 @@ inline void mandatory( JsonObject &jo, const bool was_loaded, const std::string 
 {
     if( !reader( jo, name, member, was_loaded ) ) {
         if( !was_loaded ) {
-            jo.throw_error( "missing mandatory member \"" + name + "\"" );
+            if( jo.has_member( name ) ) {
+                jo.throw_error( "failed to read mandatory member \"" + name + "\"" );
+            } else {
+                jo.throw_error( "missing mandatory member \"" + name + "\"" );
+            }
         }
     }
 }
@@ -521,27 +551,11 @@ inline void optional( JsonObject &jo, const bool was_loaded, const std::string &
 }
 /**@}*/
 
-
-/**
- * Reads a string from JSON and (if not empty) applies the translation function to it.
- */
-inline bool translated_string_reader( JsonObject &jo, const std::string &member_name,
-                                      std::string &member, bool )
-{
-    if( !jo.read( member_name, member ) ) {
-        return false;
-    }
-    if( !member.empty() ) {
-        member = _( member.c_str() );
-    }
-    return true;
-}
-
 /**
  * Reads a string and stores the first byte of it in `sym`. Throws if the input contains more
  * or less than one byte.
  */
-inline bool one_char_symbol_reader( JsonObject &jo, const std::string &member_name, long &sym,
+inline bool one_char_symbol_reader( JsonObject &jo, const std::string &member_name, int &sym,
                                     bool )
 {
     std::string sym_as_string;
@@ -552,6 +566,31 @@ inline bool one_char_symbol_reader( JsonObject &jo, const std::string &member_na
         jo.throw_error( member_name + " must be exactly one ASCII character", member_name );
     }
     sym = sym_as_string.front();
+    return true;
+}
+
+/**
+ * Reads a UTF-8 string (or int as legacy fallback) and stores Unicode codepoint of it in `symbol`.
+ * Throws if the inputs width is more than one console cell wide.
+ */
+inline bool unicode_codepoint_from_symbol_reader( JsonObject &jo, const std::string &member_name,
+        uint32_t &member, bool )
+{
+    int sym_as_int;
+    std::string sym_as_string;
+    if( !jo.read( member_name, sym_as_string, false ) ) {
+        // Legacy fallback to integer `sym`.
+        if( !jo.read( member_name, sym_as_int ) ) {
+            return false;
+        } else {
+            sym_as_string = string_from_int( sym_as_int );
+        }
+    }
+    uint32_t sym_as_codepoint = UTF8_getch( sym_as_string );
+    if( mk_wcwidth( sym_as_codepoint ) != 1 ) {
+        jo.throw_error( member_name + " must be exactly one console cell wide", member_name );
+    }
+    member = sym_as_codepoint;
     return true;
 }
 
@@ -587,6 +626,22 @@ struct handler<std::bitset<N>> {
     }
     template<typename T>
     void erase( std::bitset<N> &container, const T &data ) const {
+        container.reset( data );
+    }
+    static constexpr bool is_container = true;
+};
+
+template<typename E>
+struct handler<enum_bitset<E>> {
+    void clear( enum_bitset<E> &container ) const {
+        container.reset();
+    }
+    template<typename T>
+    void insert( enum_bitset<E> &container, const T &data ) const {
+        container.set( data );
+    }
+    template<typename T>
+    void erase( enum_bitset<E> &container, const T &data ) const {
         container.reset( data );
     }
     static constexpr bool is_container = true;
@@ -753,18 +808,6 @@ class generic_typed_reader
 };
 
 /**
- * Converts the input string into a `nc_color`.
- */
-class color_reader : public generic_typed_reader<color_reader>
-{
-    public:
-        nc_color get_next( JsonIn &jin ) const {
-            // TODO: check for valid color name
-            return color_from_string( jin.get_string() );
-        }
-};
-
-/**
  * Converts the JSON string to some type that must be construable from a `std::string`,
  * e.g. @ref string_id.
  * Example:
@@ -792,36 +835,46 @@ class auto_flags_reader : public generic_typed_reader<auto_flags_reader<FlagType
  * One can use this if the member is `std::set<some_enum>` or `some_enum` and a
  * map `std::map<std::string, some_enum>` with all the value enumeration values exists.
  *
- * The class can be instantiated for a given map `mapping` like this:
- * `typed_flag_reader<decltype(mapping)> reader{ mapping, "error" };`
- * The error string (@ref error_msg) is used when the input contains invalid flags
+ * The class can be conveniently instantiated for a given map `mapping` using
+ * the helper function @ref make_flag_reader (see below).
+ * The flag type (@ref flag_type) is used when the input contains invalid flags
  * (a string that is not contained in the map). It should sound something like
- * "invalid my-enum-type".
+ * "my-enum-type".
  */
-template<typename C>
-class typed_flag_reader : public generic_typed_reader<typed_flag_reader<C>>
+template<typename T>
+class typed_flag_reader : public generic_typed_reader<typed_flag_reader<T>>
 {
-    protected:
-        const C &flag_map;
-        const std::string error_msg;
+    private:
+        using map_t = std::map<std::string, T>;
+
+    private:
+        const map_t &flag_map;
+        const std::string flag_type;
 
     public:
-        typed_flag_reader( const C &m, const std::string &e )
-            : flag_map( m )
-            , error_msg( e ) {
+        typed_flag_reader( const map_t &flag_map, const std::string &flag_type )
+            : flag_map( flag_map )
+            , flag_type( flag_type ) {
         }
 
-        typename C::mapped_type get_next( JsonIn &jin ) const {
-            const auto position = jin.tell();
+        T get_next( JsonIn &jin ) const {
             const std::string flag = jin.get_string();
             const auto iter = flag_map.find( flag );
-            if( iter == flag_map.end() ) {
-                jin.seek( position );
-                jin.error( error_msg + ": \"" + flag + "\"" );
+
+            if( iter == flag_map.cend() ) {
+                jin.seek( jin.tell() );
+                jin.error( string_format( "invalid %s: \"%s\"", flag_type, flag ) );
             }
+
             return iter->second;
         }
 };
+
+template<typename T>
+typed_flag_reader<T> make_flag_reader( const std::map<std::string, T> &m, const std::string &e )
+{
+    return typed_flag_reader<T> { m, e };
+}
 
 /**
  * Uses @ref io::string_to_enum to convert the string from JSON to a C++ enum.
@@ -829,7 +882,13 @@ class typed_flag_reader : public generic_typed_reader<typed_flag_reader<C>>
 template<typename E>
 class enum_flags_reader : public generic_typed_reader<enum_flags_reader<E>>
 {
+    private:
+        const std::string flag_type;
+
     public:
+        enum_flags_reader( const std::string &flag_type ) : flag_type( flag_type ) {
+        }
+
         E get_next( JsonIn &jin ) const {
             const auto position = jin.tell();
             const std::string flag = jin.get_string();
@@ -837,7 +896,7 @@ class enum_flags_reader : public generic_typed_reader<enum_flags_reader<E>>
                 return io::string_to_enum<E>( flag );
             } catch( const io::InvalidEnumString & ) {
                 jin.seek( position );
-                jin.error( "invalid enumeration value: \"" + flag + "\"" );
+                jin.error( string_format( "invalid %s: \"%s\"", flag_type, flag ) );
                 throw; // ^^ throws already
             }
         }

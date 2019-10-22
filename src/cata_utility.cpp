@@ -1,29 +1,56 @@
 #include "cata_utility.h"
 
-#include "options.h"
-#include "material.h"
-#include "enums.h"
-#include "item.h"
-#include "creature.h"
-#include "translations.h"
-#include "debug.h"
-#include "mapsharing.h"
-#include "output.h"
-#include "json.h"
-#include "filesystem.h"
-#include "item_search.h"
-#include "rng.h"
-#include "units.h"
-
+#include <cctype>
+#include <cstdio>
 #include <algorithm>
 #include <cmath>
 #include <string>
-#include <locale>
+#include <exception>
+#include <iterator>
+#include <memory>
+#include <sstream>
+#include <stdexcept>
+
+#include "debug.h"
+#include "filesystem.h"
+#include "json.h"
+#include "mapsharing.h"
+#include "options.h"
+#include "output.h"
+#include "rng.h"
+#include "translations.h"
+#include "units.h"
+#include "catacharset.h"
+
+static double pow10( unsigned int n )
+{
+    double ret = 1;
+    double tmp = 10;
+    while( n ) {
+        if( n & 1 ) {
+            ret *= tmp;
+        }
+        tmp *= tmp;
+        n >>= 1;
+    }
+    return ret;
+}
 
 double round_up( double val, unsigned int dp )
 {
-    const double denominator = std::pow( 10.0, double( dp ) );
+    // Some implementations of std::pow does not return the accurate result even
+    // for small powers of 10, so we use a specialized routine to calculate them.
+    const double denominator = pow10( dp );
     return std::ceil( denominator * val ) / denominator;
+}
+
+int modulo( int v, int m )
+{
+    // C++11: negative v and positive m result in negative v%m (or 0),
+    // but this is supposed to be mathematical modulo: 0 <= v%m < m,
+    const int r = v % m;
+    // Adding m in that (and only that) case.
+    return r >= 0 ? r : r + m;
 }
 
 bool isBetween( int test, int down, int up )
@@ -33,6 +60,16 @@ bool isBetween( int test, int down, int up )
 
 bool lcmatch( const std::string &str, const std::string &qry )
 {
+    if( std::locale().name() != "en_US.UTF-8" && std::locale().name() != "C" ) {
+        auto &f = std::use_facet<std::ctype<wchar_t>>( std::locale() );
+        std::wstring wneedle = utf8_to_wstr( qry );
+        std::wstring whaystack = utf8_to_wstr( str );
+
+        f.tolower( &whaystack[0], &whaystack[0] + whaystack.size() );
+        f.tolower( &wneedle[0], &wneedle[0] + wneedle.size() );
+
+        return whaystack.find( wneedle ) != std::wstring::npos;
+    }
     std::string needle;
     needle.reserve( qry.size() );
     std::transform( qry.begin(), qry.end(), std::back_inserter( needle ), tolower );
@@ -44,75 +81,43 @@ bool lcmatch( const std::string &str, const std::string &qry )
     return haystack.find( needle ) != std::string::npos;
 }
 
-std::vector<map_item_stack> filter_item_stacks( std::vector<map_item_stack> stack,
-        std::string filter )
+bool lcmatch( const translation &str, const std::string &qry )
 {
-    std::vector<map_item_stack> ret;
+    return lcmatch( str.translated(), qry );
+}
 
-    std::string sFilterTemp = filter;
-    auto z = item_filter_from_string( filter );
-    std::copy_if( stack.begin(),
-                  stack.end(),
-                  std::back_inserter( ret ),
-    [z]( const map_item_stack & a ) {
-        if( a.example != nullptr ) {
-            return z( *a.example );
-        }
+bool match_include_exclude( const std::string &text, std::string filter )
+{
+    size_t iPos;
+    bool found = false;
+
+    if( filter.empty() ) {
         return false;
     }
-                );
 
-    return ret;
-}
+    do {
+        iPos = filter.find( ',' );
 
-//returns the first non priority items.
-int list_filter_high_priority( std::vector<map_item_stack> &stack, std::string priorities )
-{
-    //TODO:optimize if necessary
-    std::vector<map_item_stack> tempstack; // temp
-    const auto filter_fn = item_filter_from_string( priorities );
-    for( auto it = stack.begin(); it != stack.end(); ) {
-        if( priorities.empty() || ( it->example != nullptr && !filter_fn( *it->example ) ) ) {
-            tempstack.push_back( *it );
-            it = stack.erase( it );
-        } else {
-            it++;
+        std::string term = iPos == std::string::npos ? filter : filter.substr( 0, iPos );
+        const bool exclude = term.substr( 0, 1 ) == "-";
+        if( exclude ) {
+            term = term.substr( 1 );
         }
-    }
 
-    int id = stack.size();
-    for( auto &elem : tempstack ) {
-        stack.push_back( elem );
-    }
-    return id;
-}
+        if( ( !found || exclude ) && lcmatch( text, term ) ) {
+            if( exclude ) {
+                return false;
+            }
 
-int list_filter_low_priority( std::vector<map_item_stack> &stack, int start,
-                              std::string priorities )
-{
-    //TODO:optimize if necessary
-    std::vector<map_item_stack> tempstack; // temp
-    const auto filter_fn = item_filter_from_string( priorities );
-    for( auto it = stack.begin() + start; it != stack.end(); ) {
-        if( !priorities.empty() && it->example != nullptr && filter_fn( *it->example ) ) {
-            tempstack.push_back( *it );
-            it = stack.erase( it );
-        } else {
-            it++;
+            found = true;
         }
-    }
 
-    int id = stack.size();
-    for( auto &elem : tempstack ) {
-        stack.push_back( elem );
-    }
-    return id;
-}
+        if( iPos != std::string::npos ) {
+            filter = filter.substr( iPos + 1, filter.size() );
+        }
+    } while( iPos != std::string::npos );
 
-bool pair_greater_cmp::operator()( const std::pair<int, tripoint> &a,
-                                   const std::pair<int, tripoint> &b ) const
-{
-    return a.first > b.first;
+    return found;
 }
 
 // --- Library functions ---
@@ -172,6 +177,9 @@ const char *velocity_units( const units_type vel_units )
 {
     if( get_option<std::string>( "USE_METRIC_SPEEDS" ) == "mph" ) {
         return _( "mph" );
+    } else if( get_option<std::string>( "USE_METRIC_SPEEDS" ) == "t/t" ) {
+        //~ vehicle speed tiles per turn
+        return _( "t/t" );
     } else {
         switch( vel_units ) {
             case VU_VEHICLE:
@@ -214,10 +222,11 @@ const char *volume_units_long()
 
 double convert_velocity( int velocity, const units_type vel_units )
 {
+    const std::string type = get_option<std::string>( "USE_METRIC_SPEEDS" );
     // internal units to mph conversion
-    double ret = double( velocity ) / 100;
+    double ret = static_cast<double>( velocity ) / 100;
 
-    if( get_option<std::string>( "USE_METRIC_SPEEDS" ) == "km/h" ) {
+    if( type == "km/h" ) {
         switch( vel_units ) {
             case VU_VEHICLE:
                 // mph to km/h conversion
@@ -228,7 +237,10 @@ double convert_velocity( int velocity, const units_type vel_units )
                 ret *= 0.447f;
                 break;
         }
+    } else if( type == "t/t" ) {
+        ret /= 4;
     }
+
     return ret;
 }
 
@@ -245,7 +257,7 @@ double convert_weight( const units::mass &weight )
 
 double convert_volume( int volume )
 {
-    return convert_volume( volume, NULL );
+    return convert_volume( volume, nullptr );
 }
 
 double convert_volume( int volume, int *out_scale )
@@ -263,7 +275,7 @@ double convert_volume( int volume, int *out_scale )
         ret *= 0.00105669;
         scale = 2;
     }
-    if( out_scale != NULL ) {
+    if( out_scale != nullptr ) {
         *out_scale = scale;
     }
     return ret;
@@ -274,23 +286,33 @@ double temp_to_celsius( double fahrenheit )
     return ( ( fahrenheit - 32.0 ) * 5.0 / 9.0 );
 }
 
+double temp_to_kelvin( double fahrenheit )
+{
+    return temp_to_celsius( fahrenheit ) + 273.15;
+}
+
+double kelvin_to_fahrenheit( double kelvin )
+{
+    return 1.8 * ( kelvin - 273.15 ) + 32;
+}
+
 double clamp_to_width( double value, int width, int &scale )
 {
-    return clamp_to_width( value, width, scale, NULL );
+    return clamp_to_width( value, width, scale, nullptr );
 }
 
 double clamp_to_width( double value, int width, int &scale, bool *out_truncated )
 {
-    if( out_truncated != NULL ) {
+    if( out_truncated != nullptr ) {
         *out_truncated = false;
     }
     if( value >= std::pow( 10.0, width ) ) {
         // above the maximum number we can fit in the width without decimal
-        // show the bigest number we can without decimal
+        // show the biggest number we can without decimal
         // flag as truncated
         value = std::pow( 10.0, width ) - 1.0;
         scale = 0;
-        if( out_truncated != NULL ) {
+        if( out_truncated != nullptr ) {
             *out_truncated = true;
         }
     } else if( scale > 0 ) {
@@ -328,31 +350,19 @@ float multi_lerp( const std::vector<std::pair<float, float>> &points, float x )
     return ( t * points[i].second ) + ( ( 1 - t ) * points[i - 1].second );
 }
 
-ofstream_wrapper::ofstream_wrapper( const std::string &path )
+void write_to_file( const std::string &path, const std::function<void( std::ostream & )> &writer )
 {
-    file_stream.open( path.c_str(), std::ios::binary );
-    if( !file_stream.is_open() ) {
-        throw std::runtime_error( "opening file failed" );
-    }
-}
-
-ofstream_wrapper::~ofstream_wrapper() = default;
-
-void ofstream_wrapper::close()
-{
-    file_stream.close();
-    if( file_stream.fail() ) {
-        throw std::runtime_error( "writing to file failed" );
-    }
+    // Any of the below may throw. ofstream_wrapper will clean up the temporary path on its own.
+    ofstream_wrapper fout( path, std::ios::binary );
+    writer( fout.stream() );
+    fout.close();
 }
 
 bool write_to_file( const std::string &path, const std::function<void( std::ostream & )> &writer,
                     const char *const fail_message )
 {
     try {
-        ofstream_wrapper fout( path );
-        writer( fout.stream() );
-        fout.close();
+        write_to_file( path, writer );
         return true;
 
     } catch( const std::exception &err ) {
@@ -363,44 +373,19 @@ bool write_to_file( const std::string &path, const std::function<void( std::ostr
     }
 }
 
-ofstream_wrapper_exclusive::ofstream_wrapper_exclusive( const std::string &path )
+ofstream_wrapper::ofstream_wrapper( const std::string &path, const std::ios::openmode mode )
     : path( path )
+
 {
-    fopen_exclusive( file_stream, path.c_str(), std::ios::binary );
-    if( !file_stream.is_open() ) {
-        throw std::runtime_error( _( "opening file failed" ) );
-    }
+    open( mode );
 }
 
-ofstream_wrapper_exclusive::~ofstream_wrapper_exclusive()
-{
-    if( file_stream.is_open() ) {
-        fclose_exclusive( file_stream, path.c_str() );
-    }
-}
-
-void ofstream_wrapper_exclusive::close()
-{
-    fclose_exclusive( file_stream, path.c_str() );
-    if( file_stream.fail() ) {
-        throw std::runtime_error( _( "writing to file failed" ) );
-    }
-}
-
-bool write_to_file_exclusive( const std::string &path,
-                              const std::function<void( std::ostream & )> &writer, const char *const fail_message )
+ofstream_wrapper::~ofstream_wrapper()
 {
     try {
-        ofstream_wrapper_exclusive fout( path );
-        writer( fout.stream() );
-        fout.close();
-        return true;
-
-    } catch( const std::exception &err ) {
-        if( fail_message ) {
-            popup( _( "Failed to write %1$s to \"%2$s\": %3$s" ), fail_message, path.c_str(), err.what() );
-        }
-        return false;
+        close();
+    } catch( ... ) {
+        // ignored in destructor
     }
 }
 
@@ -426,7 +411,7 @@ std::istream &safe_getline( std::istream &ins, std::string &str )
                 }
                 return ins;
             default:
-                str += ( char )c;
+                str += static_cast<char>( c );
         }
     }
 }
@@ -490,12 +475,12 @@ bool read_from_file_optional( const std::string &path, JsonDeserializer &reader 
     } );
 }
 
-std::string obscure_message( const std::string &str, std::function<char( void )> f )
+std::string obscure_message( const std::string &str, std::function<char()> f )
 {
     //~ translators: place some random 1-width characters here in your language if possible, or leave it as is
     std::string gibberish_narrow = _( "abcdefghijklmnopqrstuvwxyz" );
-    //~ translators: place some random 2-width characters here in your language if possible, or leave it as is
     std::string gibberish_wide =
+        //~ translators: place some random 2-width characters here in your language if possible, or leave it as is
         _( "に坂索トし荷測のンおク妙免イロコヤ梅棋厚れ表幌" );
     std::wstring w_gibberish_narrow = utf8_to_wstr( gibberish_narrow );
     std::wstring w_gibberish_wide = utf8_to_wstr( gibberish_wide );
@@ -513,7 +498,7 @@ std::string obscure_message( const std::string &str, std::function<char( void )>
                 w_str[i] = random_entry( w_gibberish_wide );
             }
         } else {
-            // Only support the case eg. replace current character to symbols like # or ?
+            // Only support the case e.g. replace current character to symbols like # or ?
             if( utf8_width( transformation ) != 1 ) {
                 debugmsg( "target character isn't narrow" );
             }
@@ -526,4 +511,43 @@ std::string obscure_message( const std::string &str, std::function<char( void )>
         debugmsg( "utf8_width differ between original string and obscured string" );
     }
     return result;
+}
+
+std::string serialize_wrapper( const std::function<void( JsonOut & )> &callback )
+{
+    std::ostringstream buffer;
+    JsonOut jsout( buffer );
+    callback( jsout );
+    return buffer.str();
+}
+
+void deserialize_wrapper( const std::function<void( JsonIn & )> &callback, const std::string &data )
+{
+    std::istringstream buffer( data );
+    JsonIn jsin( buffer );
+    callback( jsin );
+}
+
+bool string_starts_with( const std::string &s1, const std::string &s2 )
+{
+    return s1.compare( 0, s2.size(), s2 ) == 0;
+}
+
+bool string_ends_with( const std::string &s1, const std::string &s2 )
+{
+    return s1.size() >= s2.size() &&
+           s1.compare( s1.size() - s2.size(), s2.size(), s2 ) == 0;
+}
+
+std::string join( const std::vector<std::string> &strings, const std::string &joiner )
+{
+    std::ostringstream buffer;
+
+    for( auto a = strings.begin(); a != strings.end(); ++a ) {
+        if( a != strings.begin() ) {
+            buffer << joiner;
+        }
+        buffer << *a;
+    }
+    return buffer.str();
 }

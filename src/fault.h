@@ -2,17 +2,15 @@
 #ifndef FAULT_H
 #define FAULT_H
 
+#include <map>
+#include <string>
+
 #include "string_id.h"
-#include "json.h"
+#include "translations.h"
+#include "type_id.h"
 
-class fault;
-using fault_id = string_id<fault>;
-
-class Skill;
-using skill_id = string_id<Skill>;
-
+class JsonObject;
 struct requirement_data;
-using requirement_id = string_id<requirement_data>;
 
 class fault
 {
@@ -27,12 +25,12 @@ class fault
             return id_ == fault_id( "null" );
         }
 
-        const std::string &name() const {
-            return name_;
+        std::string name() const {
+            return name_.translated();
         }
 
-        const std::string &description() const {
-            return description_;
+        std::string description() const {
+            return description_.translated();
         }
 
         int time() const {
@@ -61,8 +59,8 @@ class fault
 
     private:
         fault_id id_;
-        std::string name_;
-        std::string description_;
+        translation name_;
+        translation description_;
         int time_;
         std::map<skill_id, int> skills_;
         requirement_id requirements_;

@@ -2,16 +2,24 @@
 #ifndef MATTACK_ACTORS_H
 #define MATTACK_ACTORS_H
 
-#include "mtype.h"
-#include "damage.h"
-#include "weighted_list.h"
-#include "mattack_common.h"
-#include <tuple>
-#include <vector>
+#include <climits>
 #include <map>
+#include <vector>
+#include <string>
+#include <utility>
+
+#include "damage.h"
+#include "mattack_common.h"
+#include "magic.h"
+#include "mtype.h"
+#include "translations.h"
+#include "type_id.h"
+#include "weighted_list.h"
+#include "bodypart.h"
 
 class JsonObject;
 class monster;
+class Creature;
 
 class leap_actor : public mattack_actor
 {
@@ -27,12 +35,28 @@ class leap_actor : public mattack_actor
         // Don't jump if distance to target is more than this
         float max_consider_range;
 
-        leap_actor() { }
-        ~leap_actor() override { }
+        leap_actor() = default;
+        ~leap_actor() override = default;
 
-        void load_internal( JsonObject &jo, const std::string &src ) override;
+        void load_internal( JsonObject &obj, const std::string &src ) override;
         bool call( monster & ) const override;
-        mattack_actor *clone() const override;
+        std::unique_ptr<mattack_actor> clone() const override;
+};
+
+class mon_spellcasting_actor : public mattack_actor
+{
+    public:
+        // is the spell beneficial to target itself?
+        bool self;
+        spell spell_data;
+        int move_cost;
+
+        mon_spellcasting_actor() = default;
+        ~mon_spellcasting_actor() override = default;
+
+        void load_internal( JsonObject &obj, const std::string &src ) override;
+        bool call( monster & ) const override;
+        std::unique_ptr<mattack_actor> clone() const override;
 };
 
 class melee_actor : public mattack_actor
@@ -61,28 +85,28 @@ class melee_actor : public mattack_actor
         std::vector<mon_effect_data> effects;
 
         /** Message for missed attack against the player. */
-        std::string miss_msg_u;
+        translation miss_msg_u;
         /** Message for 0 damage hit against the player. */
-        std::string no_dmg_msg_u;
+        translation no_dmg_msg_u;
         /** Message for damaging hit against the player. */
-        std::string hit_dmg_u;
+        translation hit_dmg_u;
 
         /** Message for missed attack against a non-player. */
-        std::string miss_msg_npc;
+        translation miss_msg_npc;
         /** Message for 0 damage hit against a non-player. */
-        std::string no_dmg_msg_npc;
+        translation no_dmg_msg_npc;
         /** Message for damaging hit against a non-player. */
-        std::string hit_dmg_npc;
+        translation hit_dmg_npc;
 
         melee_actor();
-        ~melee_actor() override { }
+        ~melee_actor() override = default;
 
         virtual Creature *find_target( monster &z ) const;
         virtual void on_damage( monster &z, Creature &target, dealt_damage_instance &dealt ) const;
 
-        void load_internal( JsonObject &jo, const std::string &src ) override;
+        void load_internal( JsonObject &obj, const std::string &src ) override;
         bool call( monster & ) const override;
-        mattack_actor *clone() const override;
+        std::unique_ptr<mattack_actor> clone() const override;
 };
 
 class bite_actor : public melee_actor
@@ -93,12 +117,12 @@ class bite_actor : public melee_actor
         int no_infection_chance;
 
         bite_actor();
-        ~bite_actor() override { }
+        ~bite_actor() override = default;
 
         void on_damage( monster &z, Creature &target, dealt_damage_instance &dealt ) const override;
 
-        void load_internal( JsonObject &jo, const std::string &src ) override;
-        mattack_actor *clone() const override;
+        void load_internal( JsonObject &obj, const std::string &src ) override;
+        std::unique_ptr<mattack_actor> clone() const override;
 };
 
 class gun_actor : public mattack_actor
@@ -120,7 +144,7 @@ class gun_actor : public mattack_actor
         /*@}*/
 
         /** Specify weapon mode to use at different engagement distances */
-        std::map<std::pair<int, int>, std::string> ranges;
+        std::map<std::pair<int, int>, gun_mode_id> ranges;
 
         int max_ammo = INT_MAX; /** limited also by monster starting_ammo */
 
@@ -145,11 +169,11 @@ class gun_actor : public mattack_actor
         bool require_targeting_npc = false;
         bool require_targeting_monster = false;
 
-        int targeting_timeout = 8; /** Default turns afer which targeting is lsot and needs repeating */
+        int targeting_timeout = 8; /** Default turns after which targeting is lost and needs repeating */
         int targeting_timeout_extend = 3; /** Increase timeout by this many turns after each shot */
 
         std::string targeting_sound;
-        int targeting_volume = 6; /** If set to zero don't emit any targetting sounds */
+        int targeting_volume = 6; /** If set to zero don't emit any targeting sounds */
 
         bool laser_lock = false; /** Does switching between targets incur further targeting penalty */
         /*@}*/
@@ -157,14 +181,14 @@ class gun_actor : public mattack_actor
         /** If true then disable this attack completely if not brightly lit */
         bool require_sunlight = false;
 
-        void shoot( monster &z, Creature &target, const std::string &mode ) const;
+        void shoot( monster &z, Creature &target, const gun_mode_id &mode ) const;
 
         gun_actor();
-        ~gun_actor() override { }
+        ~gun_actor() override = default;
 
-        void load_internal( JsonObject &jo, const std::string &src ) override;
+        void load_internal( JsonObject &obj, const std::string &src ) override;
         bool call( monster & ) const override;
-        mattack_actor *clone() const override;
+        std::unique_ptr<mattack_actor> clone() const override;
 };
 
 #endif

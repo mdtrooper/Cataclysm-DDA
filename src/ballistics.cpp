@@ -1,5 +1,14 @@
 #include "ballistics.h"
 
+#include <cmath>
+#include <cstddef>
+#include <algorithm>
+#include <list>
+#include <memory>
+#include <set>
+#include <vector>
+
+#include "avatar.h"
 #include "creature.h"
 #include "dispersion.h"
 #include "explosion.h"
@@ -9,13 +18,21 @@
 #include "messages.h"
 #include "monster.h"
 #include "options.h"
-#include "player.h"
 #include "projectile.h"
+#include "rng.h"
 #include "sounds.h"
 #include "trap.h"
-#include "vehicle.h"
-
-#include <algorithm>
+#include "vpart_position.h"
+#include "calendar.h"
+#include "damage.h"
+#include "debug.h"
+#include "enums.h"
+#include "item.h"
+#include "optional.h"
+#include "translations.h"
+#include "units.h"
+#include "type_id.h"
+#include "point.h"
 
 const efftype_id effect_bounced( "bounced" );
 
@@ -33,7 +50,7 @@ static void drop_or_embed_projectile( const dealt_projectile_attack &attack )
     if( effects.count( "SHATTER_SELF" ) ) {
         // Drop the contents, not the thrown item
         if( g->u.sees( pt ) ) {
-            add_msg( _( "The %s shatters!" ), drop_item.tname().c_str() );
+            add_msg( _( "The %s shatters!" ), drop_item.tname() );
         }
 
         for( const item &i : drop_item.contents ) {
@@ -41,7 +58,22 @@ static void drop_or_embed_projectile( const dealt_projectile_attack &attack )
         }
         // TODO: Non-glass breaking
         // TODO: Wine glass breaking vs. entire sheet of glass breaking
-        sounds::sound( pt, 16, _( "glass breaking!" ) );
+        sounds::sound( pt, 16, sounds::sound_t::combat, _( "glass breaking!" ), false, "bullet_hit",
+                       "hit_glass" );
+        return;
+    }
+
+    if( effects.count( "BURST" ) ) {
+        // Drop the contents, not the thrown item
+        if( g->u.sees( pt ) ) {
+            add_msg( _( "The %s bursts!" ), drop_item.tname() );
+        }
+
+        for( const item &i : drop_item.contents ) {
+            g->m.add_item_or_charges( pt, i );
+        }
+
+        //TODO: Sound
         return;
     }
 
@@ -51,9 +83,9 @@ static void drop_or_embed_projectile( const dealt_projectile_attack &attack )
     monster *mon = dynamic_cast<monster *>( attack.hit_critter );
 
     // We can only embed in monsters
-    bool embed = mon != nullptr && !mon->is_dead_state();
+    bool mon_there = mon != nullptr && !mon->is_dead_state();
     // And if we actually want to embed
-    embed = embed && effects.count( "NO_EMBED" ) == 0;
+    bool embed = mon_there && effects.count( "NO_EMBED" ) == 0 && effects.count( "TANGLE" ) == 0;
     // Don't embed in small creatures
     if( embed ) {
         const m_size critter_size = mon->get_size();
@@ -72,12 +104,18 @@ static void drop_or_embed_projectile( const dealt_projectile_attack &attack )
     if( embed ) {
         mon->add_item( dropped_item );
         if( g->u.sees( *mon ) ) {
-            add_msg( _( "The %1$s embeds in %2$s!" ),
-                     dropped_item.tname().c_str(),
-                     mon->disp_name().c_str() );
+            add_msg( _( "The %1$s embeds in %2$s!" ), dropped_item.tname(), mon->disp_name() );
         }
     } else {
         bool do_drop = true;
+        // monsters that are able to be tied up will store the item another way
+        // see monexamine.cpp tie_or_untie()
+        // if they arent friendly they will try and break out of the net/bolas/lassoo
+        // players and NPCs just get the downed effect, and item is dropped.
+        // TODO: storing the item on player until they recover from downed
+        if( effects.count( "TANGLE" ) && mon_there ) {
+            do_drop = false;
+        }
         if( effects.count( "ACT_ON_RANGED_HIT" ) ) {
             // Don't drop if it exploded
             do_drop = !dropped_item.process( nullptr, attack.end_point, true );
@@ -89,13 +127,13 @@ static void drop_or_embed_projectile( const dealt_projectile_attack &attack )
 
         if( effects.count( "HEAVY_HIT" ) ) {
             if( g->m.has_flag( "LIQUID", pt ) ) {
-                sounds::sound( pt, 10, _( "splash!" ) );
+                sounds::sound( pt, 10, sounds::sound_t::combat, _( "splash!" ), false, "bullet_hit", "hit_water" );
             } else {
-                sounds::sound( pt, 8, _( "thud." ) );
+                sounds::sound( pt, 8, sounds::sound_t::combat, _( "thud." ), false, "bullet_hit", "hit_wall" );
             }
             const trap &tr = g->m.tr_at( pt );
             if( tr.triggered_by_item( dropped_item ) ) {
-                tr.trigger( pt, nullptr );
+                tr.trigger( pt, nullptr, &dropped_item );
             }
         }
     }
@@ -113,7 +151,7 @@ static size_t blood_trail_len( int damage )
     return 0;
 }
 
-projectile_attack_aim projectile_attack_roll( dispersion_sources dispersion, double range,
+projectile_attack_aim projectile_attack_roll( const dispersion_sources &dispersion, double range,
         double target_size )
 {
     projectile_attack_aim aim;
@@ -141,10 +179,10 @@ projectile_attack_aim projectile_attack_roll( dispersion_sources dispersion, dou
 }
 
 dealt_projectile_attack projectile_attack( const projectile &proj_arg, const tripoint &source,
-        const tripoint &target_arg, dispersion_sources dispersion,
+        const tripoint &target_arg, const dispersion_sources &dispersion,
         Creature *origin, const vehicle *in_veh )
 {
-    const bool do_animation = get_option<bool>( "ANIMATIONS" );
+    const bool do_animation = get_option<bool>( "ANIMATION_PROJECTILES" );
 
     double range = rl_dist( source, target_arg );
 
@@ -200,7 +238,7 @@ dealt_projectile_attack projectile_attack( const projectile &proj_arg, const tri
         // cap wild misses at +/- 30 degrees
         rad += ( one_in( 2 ) ? 1 : -1 ) * std::min( ARCMIN( aim.dispersion ), DEGREES( 30 ) );
 
-        // @todo This should also represent the miss on z axis
+        // TODO: This should also represent the miss on z axis
         const int offset = std::min<int>( range, sqrtf( aim.missed_by_tiles ) );
         int new_range = no_overshoot ?
                         range + rng( -offset, offset ) :
@@ -240,14 +278,14 @@ dealt_projectile_attack projectile_attack( const projectile &proj_arg, const tri
 
     trajectory.insert( trajectory.begin(), source ); // Add the first point to the trajectory
 
-    static emit_id muzzle_smoke( "emit_smoke_plume" );
+    static emit_id muzzle_smoke( "emit_smaller_smoke_plume" );
     if( proj_effects.count( "MUZZLE_SMOKE" ) ) {
         g->m.emit_field( trajectory.front(), muzzle_smoke );
     }
 
     if( !no_overshoot && range < extend_to_range ) {
         // Continue line is very "stiff" when the original range is short
-        // @todo Make it use a more distant point for more realistic extended lines
+        // TODO: Make it use a more distant point for more realistic extended lines
         std::vector<tripoint> trajectory_extension = continue_line( trajectory,
                 extend_to_range - range );
         trajectory.reserve( trajectory.size() + trajectory_extension.size() );
@@ -282,19 +320,19 @@ dealt_projectile_attack projectile_attack( const projectile &proj_arg, const tri
         if( do_animation && !do_draw_line ) {
             // TODO: Make this draw thrown item/launched grenade/arrow
             if( projectile_skip_current_frame >= projectile_skip_calculation ) {
-                g->draw_bullet( tp, ( int )i, trajectory, bullet );
+                g->draw_bullet( tp, static_cast<int>( i ), trajectory, bullet );
                 projectile_skip_current_frame = 0;
                 // If we missed recalculate the skip factor so they spread out.
-                projectile_skip_calculation = std::max( ( size_t )range, i ) * projectile_skip_multiplier;
+                projectile_skip_calculation =
+                    std::max( static_cast<size_t>( range ), i ) * projectile_skip_multiplier;
             } else {
                 projectile_skip_current_frame++;
             }
         }
 
         if( in_veh != nullptr ) {
-            int part;
-            vehicle *other = g->m.veh_at( tp, part );
-            if( in_veh == other && other->is_inside( part ) ) {
+            const optional_vpart_position other = g->m.veh_at( tp );
+            if( in_veh == veh_pointer_or_null( other ) && other->is_inside() ) {
                 continue; // Turret is on the roof and can't hit anything inside
             }
         }
@@ -327,12 +365,13 @@ dealt_projectile_attack projectile_attack( const projectile &proj_arg, const tri
         // at the start, misses should stay as misses
         if( critter != nullptr && tp != target_arg ) {
             // Unintentional hit
-            cur_missed_by = std::max( rng_float( 0.1, 1.5 - aim.missed_by ) / critter->ranged_target_size(),
-                                      0.4 );
+            cur_missed_by = std::max( rng_float( 0.1, 1.5 - aim.missed_by ) /
+                                      critter->ranged_target_size(), 0.4 );
         }
 
         if( critter != nullptr && cur_missed_by < 1.0 ) {
-            if( in_veh != nullptr && g->m.veh_at( tp ) == in_veh && critter->is_player() ) {
+            if( in_veh != nullptr && veh_pointer_or_null( g->m.veh_at( tp ) ) == in_veh &&
+                critter->is_player() ) {
                 // Turret either was aimed by the player (who is now ducking) and shoots from above
                 // Or was just IFFing, giving lots of warnings and time to get out of the line of fire
                 continue;
@@ -352,7 +391,7 @@ dealt_projectile_attack projectile_attack( const projectile &proj_arg, const tri
             } else {
                 attack.missed_by = aim.missed_by;
             }
-        } else if( in_veh != nullptr && g->m.veh_at( tp ) == in_veh ) {
+        } else if( in_veh != nullptr && veh_pointer_or_null( g->m.veh_at( tp ) ) == in_veh ) {
             // Don't do anything, especially don't call map::shoot as this would damage the vehicle
         } else {
             g->m.shoot( tp, proj, !no_item_damage && tp == target );
@@ -371,7 +410,7 @@ dealt_projectile_attack projectile_attack( const projectile &proj_arg, const tri
         trajectory.erase( trajectory.begin() );
         trajectory.resize( traj_len-- );
         g->draw_line( tp, trajectory );
-        g->draw_bullet( tp, int( traj_len-- ), trajectory, bullet );
+        g->draw_bullet( tp, static_cast<int>( traj_len-- ), trajectory, bullet );
     }
 
     if( g->m.impassable( tp ) ) {
@@ -383,29 +422,33 @@ dealt_projectile_attack projectile_attack( const projectile &proj_arg, const tri
     apply_ammo_effects( tp, proj.proj_effects );
     const auto &expl = proj.get_custom_explosion();
     if( expl.power > 0.0f ) {
-        g->explosion( tp, proj.get_custom_explosion() );
+        explosion_handler::explosion( tp, proj.get_custom_explosion() );
     }
 
     // TODO: Move this outside now that we have hit point in return values?
     if( proj.proj_effects.count( "BOUNCE" ) ) {
-        for( size_t i = 0; i < g->num_zombies(); i++ ) {
-            monster &z = g->zombie( i );
-            if( z.is_dead() ) {
-                continue;
-            }
-            // search for monsters in radius 4 around impact site
+        // Add effect so the shooter is not targeted itself.
+        if( origin && !origin->has_effect( effect_bounced ) ) {
+            origin->add_effect( effect_bounced, 1_turns );
+        }
+        Creature *mon_ptr = g->get_creature_if( [&]( const Creature & z ) {
+            // search for creatures in radius 4 around impact site
             if( rl_dist( z.pos(), tp ) <= 4 &&
                 g->m.sees( z.pos(), tp, -1 ) ) {
                 // don't hit targets that have already been hit
                 if( !z.has_effect( effect_bounced ) ) {
-                    add_msg( _( "The attack bounced to %s!" ), z.name().c_str() );
-                    z.add_effect( effect_bounced, 1 );
-                    projectile_attack( proj, tp, z.pos(), dispersion, origin, in_veh );
-                    sfx::play_variant_sound( "fire_gun", "bio_lightning_tail",
-                                             sfx::get_heard_volume( z.pos() ), sfx::get_heard_angle( z.pos() ) );
-                    break;
+                    return true;
                 }
             }
+            return false;
+        } );
+        if( mon_ptr ) {
+            Creature &z = *mon_ptr;
+            add_msg( _( "The attack bounced to %s!" ), z.get_name() );
+            z.add_effect( effect_bounced, 1_turns );
+            projectile_attack( proj, tp, z.pos(), dispersion, origin, in_veh );
+            sfx::play_variant_sound( "fire_gun", "bio_lightning_tail",
+                                     sfx::get_heard_volume( z.pos() ), sfx::get_heard_angle( z.pos() ) );
         }
     }
 

@@ -1,16 +1,24 @@
-#include <algorithm>
+#include "game.h" // IWYU pragma: associated
 
+#include <algorithm>
+#include <sstream>
+#include <utility>
+
+#include "avatar.h"
 #include "calendar.h"
-#include "game.h"
-#include "player.h"
-#include "monster.h"
+#include "harvest.h"
+#include "input.h"
 #include "map.h"
 #include "mapdata.h"
-#include "input.h"
-#include "ui.h"
-#include "harvest.h"
+#include "output.h"
+#include "string_formatter.h"
+#include "color.h"
+#include "translations.h"
+#include "string_id.h"
 
 const skill_id skill_survival( "survival" );
+
+static const trait_id trait_ILLITERATE( "ILLITERATE" );
 
 enum class description_target : int {
     creature,
@@ -18,9 +26,9 @@ enum class description_target : int {
     terrain
 };
 
-const Creature *seen_critter( const game &g, const tripoint &p )
+static const Creature *seen_critter( const game &g, const tripoint &p )
 {
-    const Creature *critter = g.critter_at( p );
+    const Creature *critter = g.critter_at( p, true );
     if( critter != nullptr && g.u.sees( *critter ) ) {
         return critter;
     }
@@ -36,16 +44,16 @@ void game::extended_description( const tripoint &p )
     const int bottom = TERMY;
     const int width = right - left;
     const int height = bottom - top;
-    WINDOW *w_head = newwin( top, TERMX, 0, 0 );
-    WINDOW *w_main = newwin( height, width, top, left );
-    // @todo De-hardcode
-    std::string header_message = _( "\
-c to describe creatures, f to describe furniture, t to describe terrain, esc/enter to close." );
-    mvwprintz( w_head, 0, 0, c_white, header_message.c_str() );
+    catacurses::window w_head = catacurses::newwin( top, TERMX, point_zero );
+    catacurses::window w_main = catacurses::newwin( height, width, point( left, top ) );
+    // TODO: De-hardcode
+    std::string header_message =
+        _( "c to describe creatures, f to describe furniture, t to describe terrain, Esc/Enter to close." );
+    mvwprintz( w_head, point_zero, c_white, header_message );
 
     // Set up line drawings
     for( int i = 0; i < TERMX; i++ ) {
-        mvwputch( w_head, top - 1, i, c_white, LINE_OXOX );
+        mvwputch( w_head, point( i, top - 1 ), c_white, LINE_OXOX );
     }
 
     wrefresh( w_head );
@@ -89,12 +97,14 @@ c to describe creatures, f to describe furniture, t to describe terrain, esc/ent
         }
 
         std::string signage = m.get_signage( p );
-        if( signage.size() > 0 ) {
-            desc += string_format( _( "\nSign: %s" ), signage.c_str() );
+        if( !signage.empty() ) {
+            // NOLINTNEXTLINE(cata-text-style): the question mark does not end a sentence
+            desc += u.has_trait( trait_ILLITERATE ) ? _( "\nSign: ???" ) : string_format( _( "\nSign: %s" ),
+                    signage );
         }
 
         werase( w_main );
-        fold_and_print_from( w_main, 0, 0, width, 0, c_ltgray, desc );
+        fold_and_print_from( w_main, point_zero, width, 0, c_light_gray, desc );
         wrefresh( w_main );
         // TODO: use input context
         ch = inp_mngr.get_input_event().get_first_input();
@@ -111,19 +121,12 @@ c to describe creatures, f to describe furniture, t to describe terrain, esc/ent
         }
 
     } while( ch != KEY_ESCAPE && ch != '\n' );
-
-    werase( w_head );
-    werase( w_main );
-    wrefresh( w_head );
-    wrefresh( w_main );
-    delwin( w_head );
-    delwin( w_main );
 }
 
 std::string map_data_common_t::extended_description() const
 {
     std::stringstream ss;
-    ss << "<header>" << string_format( _( "That is a %s." ), name.c_str() ) << "</header>" << std::endl;
+    ss << "<header>" << string_format( _( "That is a %s." ), name() ) << "</header>" << '\n';
     ss << description << std::endl;
     bool has_any_harvest = std::any_of( harvest_by_season.begin(), harvest_by_season.end(),
     []( const harvest_id & hv ) {
@@ -143,10 +146,10 @@ std::string map_data_common_t::extended_description() const
                 continue;
             }
 
-            identical_harvest.insert( std::make_pair( hv, ( season_type )season ) );
+            identical_harvest.insert( std::make_pair( hv, static_cast<season_type>( season ) ) );
         }
         // Now print them in order of seasons
-        // @todo Highlight current season
+        // TODO: Highlight current season
         for( size_t season = SPRING; season <= WINTER; season++ ) {
             const auto range = identical_harvest.equal_range( harvest_by_season[ season ] );
             if( range.first == range.second ) {
@@ -156,7 +159,7 @@ std::string map_data_common_t::extended_description() const
             // List the seasons first
             ss << enumerate_as_string( range.first, range.second,
             []( const std::pair<harvest_id, season_type> &pr ) {
-                if( pr.second == calendar::turn.get_season() ) {
+                if( pr.second == season_of_year( calendar::turn ) ) {
                     return "<good>" + calendar::name_season( pr.second ) + "</good>";
                 }
 
@@ -165,7 +168,7 @@ std::string map_data_common_t::extended_description() const
             ss << ":" << std::endl;
             // List the drops
             // They actually describe what player can get from it now, so it isn't spoily
-            // @todo Allow spoily listing of everything
+            // TODO: Allow spoily listing of everything
             ss << range.first->first.obj().describe( player_skill ) << std::endl;
             // Remove the range from the multimap so that it isn't listed twice
             identical_harvest.erase( range.first, range.second );

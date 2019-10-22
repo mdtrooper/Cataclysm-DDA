@@ -2,25 +2,35 @@
 #ifndef OUTPUT_H
 #define OUTPUT_H
 
-#include "color.h"
-#include "cursesdef.h"
-#include "catacharset.h"
-#include "translations.h"
-#include "units.h"
-#include "printf_check.h"
-
-#include <cstdarg>
+#include <cstddef>
+#include <cstdint>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <set>
-#include <memory>
-#include <map>
+#include <algorithm>
+#include <iterator>
+#include <locale>
+#include <utility>
+
+#include "catacharset.h"
+#include "color.h"
+#include "enums.h"
+#include "player.h"
+#include "string_formatter.h"
+#include "translations.h"
+#include "units.h"
+#include "debug.h"
 
 struct input_event;
 struct iteminfo;
+
 enum direction : unsigned;
-class input_context;
+namespace catacurses
+{
+class window;
+
+using chtype = int;
+} // namespace catacurses
 
 //      LINE_NESW  - X for on, O for off
 #define LINE_XOXO 4194424 // '|'   Vertical line. ncurses: ACS_VLINE; Unicode: U+2502
@@ -47,8 +57,79 @@ class input_context;
 #define LINE_OXXX_C 0xa9
 #define LINE_XXXX_C 0xaa
 
-// a consistent border colour
-#define BORDER_COLOR c_ltgray
+#define LINE_XOXO_S "│" // '|'   Vertical line. ncurses: ACS_VLINE; Unicode: U+2502
+#define LINE_OXOX_S "─" // '-'   Horizontal line. ncurses: ACS_HLINE; Unicode: U+2500
+#define LINE_XXOO_S "└" // '|_'  Lower left corner. ncurses: ACS_LLCORNER; Unicode: U+2514
+#define LINE_OXXO_S "┌" // '|^'  Upper left corner. ncurses: ACS_ULCORNER; Unicode: U+250C
+#define LINE_OOXX_S "┐" // '^|'  Upper right corner. ncurses: ACS_URCORNER; Unicode: U+2510
+#define LINE_XOOX_S "┘" // '_|'  Lower right corner. ncurses: ACS_LRCORNER; Unicode: U+2518
+#define LINE_XXXO_S "├" // '|-'  Tee pointing right. ncurses: ACS_LTEE; Unicode: U+251C
+#define LINE_XXOX_S "┴" // '_|_' Tee pointing up. ncurses: ACS_BTEE; Unicode: U+2534
+#define LINE_XOXX_S "┤" // '-|'  Tee pointing left. ncurses: ACS_RTEE; Unicode: U+2524
+#define LINE_OXXX_S "┬" // '^|^' Tee pointing down. ncurses: ACS_TTEE; Unicode: U+252C
+#define LINE_XXXX_S "┼" // '-|-' Large Plus or cross over. ncurses: ACS_PLUS; Unicode: U+253C
+
+#define LINE_XOXO_UNICODE 0x2502
+#define LINE_OXOX_UNICODE 0x2500
+#define LINE_XXOO_UNICODE 0x2514
+#define LINE_OXXO_UNICODE 0x250C
+#define LINE_OOXX_UNICODE 0x2510
+#define LINE_XOOX_UNICODE 0x2518
+#define LINE_XXXO_UNICODE 0x251C
+#define LINE_XXOX_UNICODE 0x2534
+#define LINE_XOXX_UNICODE 0x2524
+#define LINE_OXXX_UNICODE 0x252C
+#define LINE_XXXX_UNICODE 0x253C
+
+// Supports line drawing
+inline std::string string_from_int( const catacurses::chtype ch )
+{
+    catacurses::chtype charcode = ch;
+    // LINE_NESW  - X for on, O for off
+    switch( ch ) {
+        case LINE_XOXO:
+            charcode = LINE_XOXO_C;
+            break;
+        case LINE_OXOX:
+            charcode = LINE_OXOX_C;
+            break;
+        case LINE_XXOO:
+            charcode = LINE_XXOO_C;
+            break;
+        case LINE_OXXO:
+            charcode = LINE_OXXO_C;
+            break;
+        case LINE_OOXX:
+            charcode = LINE_OOXX_C;
+            break;
+        case LINE_XOOX:
+            charcode = LINE_XOOX_C;
+            break;
+        case LINE_XXOX:
+            charcode = LINE_XXOX_C;
+            break;
+        case LINE_XXXO:
+            charcode = LINE_XXXO_C;
+            break;
+        case LINE_XOXX:
+            charcode = LINE_XOXX_C;
+            break;
+        case LINE_OXXX:
+            charcode = LINE_OXXX_C;
+            break;
+        case LINE_XXXX:
+            charcode = LINE_XXXX_C;
+            break;
+        default:
+            charcode = ch;
+            break;
+    }
+    char buffer[2] = { static_cast<char>( charcode ), '\0' };
+    return buffer;
+}
+
+// a consistent border color
+#define BORDER_COLOR c_light_gray
 
 // Display data
 extern int TERMX; // width available for display
@@ -66,27 +147,7 @@ extern int FULL_SCREEN_HEIGHT; // height of "full screen" popups
 extern int OVERMAP_WINDOW_WIDTH; // width of overmap window
 extern int OVERMAP_WINDOW_HEIGHT; // height of overmap window
 
-enum game_message_type : int {
-    m_good,    /* something good happened to the player character, eg. health boost, increasing in skill */
-    m_bad,      /* something bad happened to the player character, eg. damage, decreasing in skill */
-    m_mixed,   /* something happened to the player character which is mixed (has good and bad parts),
-                  eg. gaining a mutation with mixed effect*/
-    m_warning, /* warns the player about a danger. eg. enemy appeared, an alarm sounds, noise heard. */
-    m_info,    /* informs the player about something, eg. on examination, seeing an item,
-                  about how to use a certain function, etc. */
-    m_neutral,  /* neutral or indifferent events which aren’t informational or nothing really happened eg.
-                  a miss, a non-critical failure. May also effect for good or bad effects which are
-                  just very slight to be notable. This is the default message type. */
-
-    m_debug, /* only shown when debug_mode is true */
-    /* custom SCT colors */
-    m_headshot,
-    m_critical,
-    m_grazing
-};
-
-nc_color msgtype_to_color( const game_message_type type, const bool bOldMsg = false );
-int msgtype_to_tilecolor( const game_message_type type, const bool bOldMsg = false );
+nc_color msgtype_to_color( game_message_type type, bool bOldMsg = false );
 
 /**
  * @anchor color_tags
@@ -120,11 +181,10 @@ int msgtype_to_tilecolor( const game_message_type type, const bool bOldMsg = fal
  * they have no such note, they probably don't handle color tags (which means they just print the
  * string as is).
  *
- * Note: use @ref string_from_color to convert a `nc_color` value to a string suitable for a
- * color tag:
+ * Note: use @ref colorize to add color tags to a string.
  * \code
  *    nc_color color = ...;
- *    text = "<color_" + string_from_color( color ) + ">some text</color>";
+ *    text = colorize( "some text", color );
  * \endcode
  *
  * One can use @ref utf8_width with the second parameter set to `true` to determine the printed
@@ -132,22 +192,24 @@ int msgtype_to_tilecolor( const game_message_type type, const bool bOldMsg = fal
  * color tags. For example `utf8_width("<color_red>text</color>")` would return 23, but
  * `utf8_width("<color_red>text</color>", true)` returns 4 (the length of "text").
  */
+
 /*@{*/
 /**
  * Removes the color tags from the input string. This might be required when the string is to
  * be used for functions that don't handle color tags.
  */
-std::string remove_color_tags( const std::string &text );
+std::string remove_color_tags( const std::string &s );
 /*@}*/
 
 /**
  * Split the input text into separate lines and wrap long lines. Each resulting line is at most
  * `width` console cells long.
- * The functions handles @ref color_tags.
+ * The functions handles @ref color_tags. Color tags are added to the resulting lines so each
+ * line can be independently printed.
  * @return A vector of lines, it may contain empty strings. Each entry is at most `width`
  * console cells width.
  */
-std::vector<std::string> foldstring( std::string str, int width );
+std::vector<std::string> foldstring( const std::string &str, int width, char split = ' ' );
 
 /**
  * Print text with embedded @ref color_tags, x, y are in curses system.
@@ -156,15 +218,14 @@ std::vector<std::string> foldstring( std::string str, int width );
  * If the text contains no color tags, it's equivalent to a simple mvprintz.
  *
  * @param w Window we are drawing in
- * @param y Curses-style Y coordinate to print text at.
- * @param x Curses-style X coordinate to print text at.
+ * @param p Curses-style coordinates to print text at.
  * @param text The text to print.
  * @param cur_color The current color (could have been set by a previously encountered color tag),
  * change to a color according to the color tags that are in the text.
  * @param base_color Base color that is used outside of any color tag.
  **/
-void print_colored_text( WINDOW *w, int y, int x, nc_color &cur_color, nc_color base_color,
-                         const std::string &text );
+void print_colored_text( const catacurses::window &w, const point &p, nc_color &cur_color,
+                         const nc_color &base_color, const std::string &text );
 /**
  * Print word wrapped text (with @ref color_tags) into the window.
  *
@@ -177,117 +238,153 @@ void print_colored_text( WINDOW *w, int y, int x, nc_color &cur_color, nc_color 
  * @return The maximal scrollable offset ([number of lines to be printed] - [lines available in the window]).
  * This allows the caller to restrict the begin_line number on future calls / when modified by the user.
  */
-int print_scrollable( WINDOW *w, int begin_line, const std::string &text, nc_color base_color,
-                      const std::string &scroll_msg );
+int print_scrollable( const catacurses::window &w, int begin_line, const std::string &text,
+                      const nc_color &base_color, const std::string &scroll_msg );
 /**
- * Format, fold and print text in the given window. The function handles @ref color_tags and
- * uses them while printing. It expects a printf-like format string and matching
- * arguments to that format (see @ref string_format).
+ * Fold and print text in the given window. The function handles @ref color_tags and
+ * uses them while printing.
  *
  * @param w Window we are printing in
- * @param begin_y The column index on which to start each line.
- * @param begin_x The row index on which to print the first line.
+ * @param begin The (row, column) index on which to start.
  * @param width The width used to fold the text (see @ref foldstring). `width + begin_y` should be
  * less than the window width, otherwise the lines will be wrapped by the curses system, which
  * defeats the purpose of using `foldstring`.
- * @param color The initially used color. This can be overridden using color tags.
+ * @param base_color The initially used color. This can be overridden using color tags.
  * @param mes Actual message to print
+ * @param split Character after string is folded
  * @return The number of lines of the formatted text (after folding). This may be larger than
  * the height of the window.
  */
-int fold_and_print( WINDOW *w, int begin_y, int begin_x, int width, nc_color color,
-                    const char *mes, ... ) PRINTF_LIKE( 6, 7 );
+int fold_and_print( const catacurses::window &w, const point &begin, int width,
+                    const nc_color &base_color, const std::string &text, char split = ' ' );
 /**
- * Same as other @ref fold_and_print, but does not do any string formatting, the string is uses as is.
+ * Same as other @ref fold_and_print, but does string formatting via @ref string_format.
  */
-int fold_and_print( WINDOW *w, int begin_y, int begin_x, int width, nc_color color,
-                    const std::string &text );
+template<typename ...Args>
+inline int fold_and_print( const catacurses::window &w, const point &begin,
+                           const int width, const nc_color &base_color,
+                           const char *const mes, Args &&... args )
+{
+    return fold_and_print( w, begin, width, base_color, string_format( mes,
+                           std::forward<Args>( args )... ) );
+}
 /**
  * Like @ref fold_and_print, but starts the output with the N-th line of the folded string.
  * This can be used for scrolling large texts. Parameters have the same meaning as for
  * @ref fold_and_print, the function therefor handles @ref color_tags correctly.
  *
  * @param w Window we are printing in
- * @param begin_y The column index on which to start each line.
- * @param begin_x The row index on which to print the first line.
+ * @param begin The (row,column) index on which to start.
  * @param width The width used to fold the text (see @ref foldstring). `width + begin_y` should be
  * @param begin_line The index of the first line (of the folded string) that is to be printed.
  * The function basically removes all lines before this one and prints the remaining lines
  * with `fold_and_print`.
- * @param color The initially used color. This can be overridden using color tags.
+ * @param base_color The initially used color. This can be overridden using color tags.
  * @param mes Actual message to print
  * @return Same as `fold_and_print`: the number of lines of the text (after folding). This is
  * always the same value, regardless of `begin_line`, it can be used to determine the maximal
  * value for `begin_line`.
  */
-int fold_and_print_from( WINDOW *w, int begin_y, int begin_x, int width, int begin_line,
-                         nc_color color, const char *mes, ... ) PRINTF_LIKE( 7, 8 );
+int fold_and_print_from( const catacurses::window &w, const point &begin, int width,
+                         int begin_line, const nc_color &base_color, const std::string &text );
 /**
- * Same as other @ref fold_and_print_from, but does not do any string formatting, the string is uses as is.
+ * Same as other @ref fold_and_print_from, but does formatting via @ref string_format.
  */
-int fold_and_print_from( WINDOW *w, int begin_y, int begin_x, int width, int begin_line,
-                         nc_color color, const std::string &text );
+template<typename ...Args>
+inline int fold_and_print_from( const catacurses::window &w, const point &begin,
+                                const int width, const int begin_line, const nc_color &base_color,
+                                const char *const mes, Args &&... args )
+{
+    return fold_and_print_from( w, begin, width, begin_line, base_color,
+                                string_format( mes, std::forward<Args>( args )... ) );
+}
 /**
- * Prints a single line of formatted text. The text is automatically trimmed to fit into the given
+ * Prints a single line of text. The text is automatically trimmed to fit into the given
  * width. The function handles @ref color_tags correctly.
  *
  * @param w Window we are printing in
- * @param begin_x The x coordinate of line start (curses coordinates)
- * @param begin_y The y coordinate of line start (curses coordinates)
+ * @param begin The coordinates of line start (curses coordinates)
  * @param width Maximal width of the printed line, if the text is longer, it is cut off.
  * @param base_color The initially used color. This can be overridden using color tags.
  * @param mes Actual message to print
  */
-void trim_and_print( WINDOW *w, int begin_y, int begin_x, int width, nc_color base_color,
-                     const char *mes, ... ) PRINTF_LIKE( 6, 7 );
-void center_print( WINDOW *w, int y, nc_color FG, const char *mes, ... );
-int right_print( WINDOW *w, const int line, const int right_indent, const nc_color FG,
-                 const char *mes, ... ) PRINTF_LIKE( 5, 6 );
-void display_table( WINDOW *w, const std::string &title, int columns,
+void trim_and_print( const catacurses::window &w, const point &begin, int width,
+                     nc_color base_color, const std::string &text );
+template<typename ...Args>
+inline void trim_and_print( const catacurses::window &w, const point &begin,
+                            const int width, const nc_color base_color, const char *const mes, Args &&... args )
+{
+    return trim_and_print( w, begin, width, base_color, string_format( mes,
+                           std::forward<Args>( args )... ) );
+}
+void center_print( const catacurses::window &w, int y, const nc_color &FG,
+                   const std::string &text );
+int right_print( const catacurses::window &w, int line, int right_indent,
+                 const nc_color &FG, const std::string &text );
+void display_table( const catacurses::window &w, const std::string &title, int columns,
                     const std::vector<std::string> &data );
-void multipage( WINDOW *w, std::vector<std::string> text, std::string caption = "",
-                int begin_y = 0 );
-std::string name_and_value( std::string name, int value, int field_width );
-std::string name_and_value( std::string name, std::string value, int field_width );
+void multipage( const catacurses::window &w, const std::vector<std::string> &text,
+                const std::string &caption = "", int begin_y = 0 );
+std::string name_and_value( const std::string &name, int value, int field_width );
+std::string name_and_value( const std::string &name, const std::string &value, int field_width );
 
-void mvputch( int y, int x, nc_color FG, const std::string &ch );
-void wputch( WINDOW *w, nc_color FG, long ch );
-// Using long ch is deprecated, use an UTF-8 encoded string instead
-void mvwputch( WINDOW *w, int y, int x, nc_color FG, long ch );
-void mvwputch( WINDOW *w, int y, int x, nc_color FG, const std::string &ch );
-void mvputch_inv( int y, int x, nc_color FG, const std::string &ch );
-// Using long ch is deprecated, use an UTF-8 encoded string instead
-void mvwputch_inv( WINDOW *w, int y, int x, nc_color FG, long ch );
-void mvwputch_inv( WINDOW *w, int y, int x, nc_color FG, const std::string &ch );
-void mvputch_hi( int y, int x, nc_color FG, const std::string &ch );
-// Using long ch is deprecated, use an UTF-8 encoded string instead
-void mvwputch_hi( WINDOW *w, int y, int x, nc_color FG, long ch );
-void mvwputch_hi( WINDOW *w, int y, int x, nc_color FG, const std::string &ch );
-void mvwprintz( WINDOW *w, int y, int x, nc_color FG, const char *mes, ... ) PRINTF_LIKE( 5, 6 );
-void wprintz( WINDOW *w, nc_color FG, const char *mes, ... ) PRINTF_LIKE( 3, 4 );
+void wputch( const catacurses::window &w, nc_color FG, int ch );
+// Using int ch is deprecated, use an UTF-8 encoded string instead
+void mvwputch( const catacurses::window &w, const point &p, nc_color FG, int ch );
+void mvwputch( const catacurses::window &w, const point &p, nc_color FG, const std::string &ch );
+// Using int ch is deprecated, use an UTF-8 encoded string instead
+void mvwputch_inv( const catacurses::window &w, const point &p, nc_color FG, int ch );
+void mvwputch_inv( const catacurses::window &w, const point &p, nc_color FG,
+                   const std::string &ch );
+// Using int ch is deprecated, use an UTF-8 encoded string instead
+void mvwputch_hi( const catacurses::window &w, const point &p, nc_color FG, int ch );
+void mvwputch_hi( const catacurses::window &w, const point &p, nc_color FG, const std::string &ch );
 
-void draw_custom_border( WINDOW *w, chtype ls = 1, chtype rs = 1, chtype ts = 1, chtype bs = 1,
-                         chtype tl = 1, chtype tr = 1,
-                         chtype bl = 1, chtype br = 1, nc_color FG = BORDER_COLOR, int posy = 0, int height = 0,
-                         int posx = 0, int width = 0 );
-void draw_border( WINDOW *w, nc_color border_color = BORDER_COLOR,
-                  std::string title = "", nc_color title_color = c_ltred );
-void draw_tabs( WINDOW *w, int active_tab, ... );
+void mvwprintz( const catacurses::window &w, const point &p, const nc_color &FG,
+                const std::string &text );
+template<typename ...Args>
+inline void mvwprintz( const catacurses::window &w, const point &p, const nc_color &FG,
+                       const char *const mes, Args &&... args )
+{
+    mvwprintz( w, p, FG, string_format( mes, std::forward<Args>( args )... ) );
+}
 
-std::string word_rewrap( const std::string &ins, int width );
+void wprintz( const catacurses::window &w, const nc_color &FG, const std::string &text );
+template<typename ...Args>
+inline void wprintz( const catacurses::window &w, const nc_color &FG, const char *const mes,
+                     Args &&... args )
+{
+    wprintz( w, FG, string_format( mes, std::forward<Args>( args )... ) );
+}
+
+void draw_custom_border(
+    const catacurses::window &w, catacurses::chtype ls = 1, catacurses::chtype rs = 1,
+    catacurses::chtype ts = 1, catacurses::chtype bs = 1, catacurses::chtype tl = 1,
+    catacurses::chtype tr = 1, catacurses::chtype bl = 1, catacurses::chtype br = 1,
+    nc_color FG = BORDER_COLOR, const point &pos = point_zero, int height = 0, int width = 0 );
+void draw_border( const catacurses::window &w, nc_color border_color = BORDER_COLOR,
+                  const std::string &title = "", nc_color title_color = c_light_red );
+void draw_border_below_tabs( const catacurses::window &w, nc_color border_color = BORDER_COLOR );
+
+std::string word_rewrap( const std::string &ins, int width, uint32_t split = ' ' );
 std::vector<size_t> get_tag_positions( const std::string &s );
 std::vector<std::string> split_by_color( const std::string &s );
 
-bool query_yn( const char *mes, ... ) PRINTF_LIKE( 1, 2 );
-bool query_int( int &result, const char *mes, ... ) PRINTF_LIKE( 2, 3 );
+bool query_yn( const std::string &text );
+template<typename ...Args>
+inline bool query_yn( const char *const msg, Args &&... args )
+{
+    return query_yn( string_format( msg, std::forward<Args>( args )... ) );
+}
 
-bool internal_query_yn( const char *mes, va_list ap );
+bool query_int( int &result, const std::string &text );
+template<typename ...Args>
+inline bool query_int( int &result, const char *const msg, Args &&... args )
+{
+    return query_int( result, string_format( msg, std::forward<Args>( args )... ) );
+}
 
-// for the next two functions, if cancelable is true, esc returns the last option
-int  menu_vec( bool cancelable, const char *mes, const std::vector<std::string> options );
-int  menu_vec( bool cancelable, const char *mes, const std::vector<std::string> &options,
-               const std::string &hotkeys_override );
-int  menu( bool cancelable, const char *mes, ... );
+std::vector<std::string> get_hotkeys( const std::string &s );
 
 /**
  * @name Popup windows
@@ -301,7 +398,7 @@ int  menu( bool cancelable, const char *mes, ... );
  * The message is a printf-like string. It may contain @ref color_tags, which are used while printing.
  *
  * - PF_GET_KEY (ignored when combined with PF_NO_WAIT) cancels the popup on *any* user input.
- *   Without the flag the popup is only canceled when the user enters new-line, space and escape.
+ *   Without the flag the popup is only canceled when the user enters new-line, Space and Escape.
  *   This flag is passed by @ref popup_getkey.
  * - PF_NO_WAIT displays the popup, but does not wait for the user input. The popup window is
  *   immediately destroyed (but will be visible until another window is redrawn over it).
@@ -316,40 +413,75 @@ int  menu( bool cancelable, const char *mes, ... );
  *
  */
 /*@{*/
-typedef enum {
+enum PopupFlags {
     PF_NONE        = 0,
     PF_GET_KEY     = 1 << 0,
     PF_NO_WAIT     = 1 << 1,
     PF_ON_TOP      = 1 << 2,
     PF_FULLSCREEN  = 1 << 3,
     PF_NO_WAIT_ON_TOP = PF_NO_WAIT | PF_ON_TOP,
-} PopupFlags;
+};
 
-long popup_getkey( const char *mes, ... ) PRINTF_LIKE( 1, 2 );
-void popup_top( const char *mes, ... ) PRINTF_LIKE( 1, 2 );
-void popup_nowait( const char *mes, ... ) PRINTF_LIKE( 1, 2 );
-void popup_status( const char *title, const char *msg, ... ) PRINTF_LIKE( 2, 3 );
-void popup( const char *mes, ... ) PRINTF_LIKE( 1, 2 );
-long popup( const std::string &text, PopupFlags flags );
-void full_screen_popup( const char *mes, ... ) PRINTF_LIKE( 1, 2 );
-
-WINDOW_PTR create_popup_window( const std::string &text, PopupFlags flags );
-WINDOW_PTR create_wait_popup_window( const std::string &text, nc_color bar_color = c_ltgreen );
+template<typename ...Args>
+inline int popup_getkey( const char *const mes, Args &&... args )
+{
+    return popup( string_format( mes, std::forward<Args>( args )... ), PF_GET_KEY );
+}
+template<typename ...Args>
+inline void popup_top( const char *const mes, Args &&... args )
+{
+    popup( string_format( mes, std::forward<Args>( args )... ), PF_ON_TOP );
+}
+template<typename ...Args>
+inline void popup_nowait( const char *mes, Args &&... args )
+{
+    popup( string_format( mes, std::forward<Args>( args )... ), PF_NO_WAIT );
+}
+void popup_status( const char *title, const std::string &mes );
+template<typename ...Args>
+inline void popup_status( const char *const title, const char *const fmt, Args &&... args )
+{
+    return popup_status( title, string_format( fmt, std::forward<Args>( args )... ) );
+}
+template<typename ...Args>
+inline void popup( const char *mes, Args &&... args )
+{
+    popup( string_format( mes, std::forward<Args>( args )... ), PF_NONE );
+}
+int popup( const std::string &text, PopupFlags flags = PF_NONE );
+template<typename ...Args>
+inline void full_screen_popup( const char *mes, Args &&... args )
+{
+    popup( string_format( mes, std::forward<Args>( args )... ), PF_FULLSCREEN );
+}
+template<typename ...Args>
+inline void popup_player_or_npc( player &p, const char *player_mes, const char *npc_mes,
+                                 Args &&... args )
+{
+    if( p.is_player() ) {
+        popup( player_mes, std::forward<Args>( args )... );
+    } else {
+        popup( p.replace_with_npc_name( string_format( npc_mes, std::forward<Args>( args )... ) ) );
+    }
+}
 
 /*@}*/
+std::string format_item_info( const std::vector<iteminfo> &vItemDisplay,
+                              const std::vector<iteminfo> &vItemCompare );
 
-input_event draw_item_info( WINDOW *win, const std::string sItemName, const std::string sTypeName,
-                            std::vector<iteminfo> &vItemDisplay, std::vector<iteminfo> &vItemCompare,
-                            int &selected, const bool without_getch = false, const bool without_border = false,
-                            const bool handle_scrolling = false, const bool scrollbar_left = true,
-                            const bool use_full_win = false );
+input_event draw_item_info( const catacurses::window &win, const std::string &sItemName,
+                            const std::string &sTypeName,
+                            const std::vector<iteminfo> &vItemDisplay, const std::vector<iteminfo> &vItemCompare,
+                            int &selected, bool without_getch = false, bool without_border = false,
+                            bool handle_scrolling = false, bool scrollbar_left = true,
+                            bool use_full_win = false, unsigned int padding = 1 );
 
-input_event draw_item_info( const int iLeft, int iWidth, const int iTop, const int iHeight,
-                            const std::string sItemName, const std::string sTypeName,
-                            std::vector<iteminfo> &vItemDisplay, std::vector<iteminfo> &vItemCompare,
-                            int &selected, const bool without_getch = false, const bool without_border = false,
-                            const bool handle_scrolling = false, const bool scrollbar_left = true,
-                            const bool use_full_win = false );
+input_event draw_item_info( int iLeft, int iWidth, int iTop, int iHeight,
+                            const std::string &sItemName, const std::string &sTypeName,
+                            const std::vector<iteminfo> &vItemDisplay, const std::vector<iteminfo> &vItemCompare,
+                            int &selected, bool without_getch = false, bool without_border = false,
+                            bool handle_scrolling = false, bool scrollbar_left = true,
+                            bool use_full_win = false, unsigned int padding = 1 );
 
 enum class item_filter_type : int {
     FIRST = 1, // used for indexing into tables
@@ -365,10 +497,11 @@ enum class item_filter_type : int {
  * @param height Every row from starty to starty + height - 1 will be cleared before printing the rules.
  * @param type Filter to use when drawing
 */
-void draw_item_filter_rules( WINDOW *win, int starty, int height, item_filter_type type );
+void draw_item_filter_rules( const catacurses::window &win, int starty, int height,
+                             item_filter_type type );
 
 char rand_char();
-long special_symbol( long sym );
+int special_symbol( int sym );
 
 // Remove spaces from the start and the end of a string.
 std::string trim( const std::string &s );
@@ -377,28 +510,7 @@ std::string trim_punctuation_marks( const std::string &s );
 // Converts the string to upper case.
 std::string to_upper_case( const std::string &s );
 
-/**
- * @name printf-like string formatting.
- *
- * These functions perform string formatting, according to the rules of the `printf` function,
- * see `man 3 printf` or any other documentation.
- *
- * In short: the pattern parameter is a string with optional placeholders, which will be
- * replaced with formatted data from the further arguments. The further arguments must have
- * a type that matches the type expected by the placeholder.
- * The placeholders look like this:
- * - `%s` expects an argument of type `const char*`, which is inserted as is.
- * - `%d` expects an argument of type `int`, which is formatted as decimal number.
- * - `%f` expects an argument of type `float` or `double`, which is formatted as decimal number.
- *
- * There are more placeholders and options to them (see documentation of `printf`).
- */
-/*@{*/
-std::string string_format( const char *pattern, ... ) PRINTF_LIKE( 1, 2 );
-std::string vstring_format( const char *pattern, va_list argptr );
-std::string string_format( std::string pattern, ... );
-std::string vstring_format( std::string const &pattern, va_list argptr );
-/*@}*/
+std::string rewrite_vsnprintf( const char *msg );
 
 // TODO: move these elsewhere
 // string manipulations.
@@ -410,19 +522,35 @@ void replace_substring( std::string &input, const std::string &substring,
 
 std::string string_replace( std::string text, const std::string &before, const std::string &after );
 std::string replace_colors( std::string text );
-std::string &capitalize_letter( std::string &pattern, size_t n = 0 );
-size_t shortcut_print( WINDOW *w, int y, int x, nc_color text_color, nc_color shortcut_color,
+std::string &capitalize_letter( std::string &str, size_t n = 0 );
+size_t shortcut_print( const catacurses::window &w, const point &p, nc_color text_color,
+                       nc_color shortcut_color, const std::string &fmt );
+size_t shortcut_print( const catacurses::window &w, nc_color text_color, nc_color shortcut_color,
                        const std::string &fmt );
-size_t shortcut_print( WINDOW *w, nc_color text_color, nc_color shortcut_color,
-                       const std::string &fmt );
+std::string shortcut_text( nc_color shortcut_color, const std::string &fmt );
 
 // short visual animation (player, monster, ...) (hit, dodge, ...)
 // cTile is a UTF-8 strings, and must be a single cell wide!
-void hit_animation( int iX, int iY, nc_color cColor, const std::string &cTile );
+void hit_animation( const point &p, nc_color cColor, const std::string &cTile );
 
-std::pair<std::string, nc_color> const &get_hp_bar( int cur_hp, int max_hp, bool is_mon = false );
+/**
+ * @return Pair of a string containing the bar, and its color
+ * @param cur Current value being formatted
+ * @param max Maximum possible value, e.g. a full bar
+ * @param extra_resolution Double the resolution of displayed values with \ symbols.
+ * @param colors A vector containing N colors with which to color the bar at different values
+ */
+// The last color is used for an empty bar
+// extra_resolution
+std::pair<std::string, nc_color> get_bar( float cur, float max, int width = 5,
+        bool extra_resolution = true,
+        const std::vector<nc_color> &colors = { c_green, c_light_green, c_yellow, c_light_red, c_red } );
 
-std::pair<std::string, nc_color> get_light_level( const float light );
+std::pair<std::string, nc_color> get_hp_bar( int cur_hp, int max_hp, bool is_mon = false );
+
+std::pair<std::string, nc_color> get_stamina_bar( int cur_stam, int max_stam );
+
+std::pair<std::string, nc_color> get_light_level( float light );
 
 /**
  * @return String containing the bar. Example: "Label [********    ]".
@@ -456,7 +584,7 @@ inline std::string get_labeled_bar( const double val, const int width, const std
         int used_width = 0;
         for( RatingIterator it( begin ); it != end; ++it ) {
             const double factor = std::min( 1.0, std::max( 0.0, it->first * val ) );
-            const int seg_width = int( factor * bar_width ) - used_width;
+            const int seg_width = static_cast<int>( factor * bar_width ) - used_width;
 
             if( seg_width <= 0 ) {
                 continue;
@@ -471,19 +599,39 @@ inline std::string get_labeled_bar( const double val, const int width, const std
     return result;
 }
 
+enum class enumeration_conjunction {
+    none,
+    and_,
+    or_
+};
+
 /**
  * @return String containing enumerated elements in format: "a, b, c, ..., and z". Uses the Oxford comma.
  * @param values A vector of strings
- * @param use_and If true, add "and" before the last element (comma otherwise).
+ * @param conj Choose how to separate the last elements.
  */
 template<typename _Container>
-std::string enumerate_as_string( const _Container &values, bool use_and = true )
+std::string enumerate_as_string( const _Container &values,
+                                 enumeration_conjunction conj = enumeration_conjunction::and_ )
 {
+    const std::string final_separator = [&]() {
+        switch( conj ) {
+            case enumeration_conjunction::none:
+                return _( ", " );
+            case enumeration_conjunction::and_:
+                return ( values.size() > 2 ? _( ", and " ) : _( " and " ) );
+            case enumeration_conjunction::or_:
+                return ( values.size() > 2 ? _( ", or " ) : _( " or " ) );
+        }
+        debugmsg( "Unexpected conjunction" );
+        return _( ", " );
+    }
+    ();
     std::ostringstream res;
     for( auto iter = values.begin(); iter != values.end(); ++iter ) {
         if( iter != values.begin() ) {
-            if( use_and && std::next( iter ) == values.end() ) {
-                res << ( values.size() > 2 ? _( ", and " ) : _( " and " ) );
+            if( std::next( iter ) == values.end() ) {
+                res << final_separator;
             } else {
                 res << _( ", " );
             }
@@ -497,22 +645,23 @@ std::string enumerate_as_string( const _Container &values, bool use_and = true )
  * @return String containing enumerated elements in format: "a, b, c, ..., and z". Uses the Oxford comma.
  * @param first Iterator pointing to the first element.
  * @param last Iterator pointing to the last element.
- * @param pred Predicate that accepts an element and returns a representing string.
+ * @param string_for Function that accepts an element and returns a representing string.
  * May return an empty string to omit the element.
- * @param use_and If true, add "and" before the last element (comma otherwise).
+ * @param conj Choose how to separate the last elements.
  */
-template<typename _FIter, typename _Predicate>
-std::string enumerate_as_string( _FIter first, _FIter last, _Predicate pred, bool use_and = true )
+template<typename _FIter, typename F>
+std::string enumerate_as_string( _FIter first, _FIter last, F string_for,
+                                 enumeration_conjunction conj = enumeration_conjunction::and_ )
 {
     std::vector<std::string> values;
-    values.reserve( size_t( std::distance( first, last ) ) );
+    values.reserve( static_cast<size_t>( std::distance( first, last ) ) );
     for( _FIter iter = first; iter != last; ++iter ) {
-        const std::string str( pred( *iter ) );
+        const std::string str( string_for( *iter ) );
         if( !str.empty() ) {
             values.push_back( str );
         }
     }
-    return enumerate_as_string( values, use_and );
+    return enumerate_as_string( values, conj );
 }
 
 /**
@@ -522,16 +671,141 @@ std::string enumerate_as_string( _FIter first, _FIter last, _Predicate pred, boo
  * @param label Label before the bar. Can be empty.
  * @param c Character to fill the bar with.
  */
-std::string get_labeled_bar( const double val, const int width, const std::string &label, char c );
+std::string get_labeled_bar( double val, int width, const std::string &label, char c );
 
-void draw_tab( WINDOW *w, int iOffsetX, std::string sText, bool bSelected );
-void draw_subtab( WINDOW *w, int iOffsetX, std::string sText, bool bSelected,
-                  bool bDecorate = true );
-void draw_scrollbar( WINDOW *window, const int iCurrentLine, const int iContentHeight,
-                     const int iNumLines, const int iOffsetY = 0, const int iOffsetX = 0,
-                     nc_color bar_color = c_white, const bool bDoNotScrollToEnd = false );
-void calcStartPos( int &iStartPos, const int iCurrentLine,
-                   const int iContentHeight, const int iNumEntries );
+void draw_tab( const catacurses::window &w, int iOffsetX, const std::string &sText,
+               bool bSelected );
+void draw_subtab( const catacurses::window &w, int iOffsetX, const std::string &sText,
+                  bool bSelected,
+                  bool bDecorate = true, bool bDisabled = false );
+
+// Draws multiple tabs, with the titles specified in tab_texts.
+// Also draws the line beneath the tabs and corners at the ends.
+// The selected tab (specified by current_tab) is drawn differently.
+// In total, something like the following:
+//   ┌──────┐ ┌──────┐
+//   │ TAB1 │ │ TAB2 │
+// ┌─┴──────┴─┘      └───────────┐
+void draw_tabs( const catacurses::window &, const std::vector<std::string> &tab_texts,
+                size_t current_tab );
+// As above, but specify current tab by its label rather than position
+void draw_tabs( const catacurses::window &, const std::vector<std::string> &tab_texts,
+                const std::string &current_tab );
+
+// This overload of draw_tabs is intended for use when you track the current
+// tab via some other value (like an enum) linked to each tab.  Expected use
+// looks something like this:
+//
+// tab_mode current_tab = ...;
+// const std::vector<std::pair<tab_mode, std::string>> tabs = {
+//      { tab_mode::first_tab, _( "FIRST_TAB" ) },
+//      { tab_mode::second_tab, _( "SECOND_TAB" ) },
+// };
+// draw_tabs( w, tabs, current_tab );
+template<typename TabList, typename CurrentTab, typename = std::enable_if_t<
+             std::is_same<CurrentTab,
+                          std::remove_const_t<typename TabList::value_type::first_type>>::value>>
+void draw_tabs( const catacurses::window &w, const TabList &tab_list,
+                const CurrentTab &current_tab )
+{
+    std::vector<std::string> tab_text;
+    std::transform( tab_list.begin(), tab_list.end(), std::back_inserter( tab_text ),
+    []( const typename TabList::value_type & pair ) {
+        return pair.second;
+    } );
+    auto current_tab_it = std::find_if( tab_list.begin(), tab_list.end(),
+    [&current_tab]( const typename TabList::value_type & pair ) {
+        return pair.first == current_tab;
+    } );
+    assert( current_tab_it != tab_list.end() );
+    draw_tabs( w, tab_text, std::distance( tab_list.begin(), current_tab_it ) );
+}
+
+// Similar to the above, but where the order of tabs is specified separately
+// TabList is expected to be a map type.
+template<typename TabList, typename TabKeys, typename CurrentTab, typename = std::enable_if_t<
+             std::is_same<CurrentTab,
+                          std::remove_const_t<typename TabList::value_type::first_type>>::value>>
+void draw_tabs( const catacurses::window &w, const TabList &tab_list, const TabKeys &keys,
+                const CurrentTab &current_tab )
+{
+    std::vector<typename TabList::value_type> ordered_tab_list;
+    for( const auto &key : keys ) {
+        auto it = tab_list.find( key );
+        assert( it != tab_list.end() );
+        ordered_tab_list.push_back( *it );
+    }
+    draw_tabs( w, ordered_tab_list, current_tab );
+}
+
+// Legacy function, use class scrollbar instead!
+void draw_scrollbar( const catacurses::window &window, int iCurrentLine,
+                     int iContentHeight, int iNumLines, const point &offset = point_zero,
+                     nc_color bar_color = c_white, bool bDoNotScrollToEnd = false );
+void calcStartPos( int &iStartPos, int iCurrentLine, int iContentHeight,
+                   int iNumEntries );
+
+class scrollbar
+{
+    public:
+        scrollbar();
+        // relative position of the scrollbar to the window
+        scrollbar &offset_x( int offx );
+        scrollbar &offset_y( int offy );
+        // total number of lines
+        scrollbar &content_size( int csize );
+        // index of the beginning line
+        scrollbar &viewport_pos( int vpos );
+        // number of lines shown
+        scrollbar &viewport_size( int vsize );
+        // window border color
+        scrollbar &border_color( nc_color border_c );
+        // scrollbar arrow color
+        scrollbar &arrow_color( nc_color arrow_c );
+        // scrollbar slot color
+        scrollbar &slot_color( nc_color slot_c );
+        // scrollbar bar color
+        scrollbar &bar_color( nc_color bar_c );
+        // can viewport_pos go beyond (content_size - viewport_size)?
+        scrollbar &scroll_to_last( bool scr2last );
+        // draw the scrollbar to the window
+        void apply( const catacurses::window &window );
+    private:
+        int offset_x_v, offset_y_v;
+        int content_size_v, viewport_pos_v, viewport_size_v;
+        nc_color border_color_v, arrow_color_v, slot_color_v, bar_color_v;
+        bool scroll_to_last_v;
+};
+
+// A simple scrolling view onto some text.  Given a window, it will use the
+// leftmost column for the scrollbar and fill the rest with text.  When the
+// scrollbar is not needed it prints a vertical border in place of it, so the
+// expectation is that the given window will overlap the left edge of a
+// bordered window if one exists.
+// (Options to e.g. not print the border would be easy to add if needed).
+// Update the text with set_text (it will be wrapped for you).
+// scroll_up and scroll_down are expected to be called from handlers for the
+// keys used for that purpose.
+// Call draw when drawing related UI stuff.  draw calls werase/wrefresh for its
+// window internally.
+class scrolling_text_view
+{
+    public:
+        scrolling_text_view( catacurses::window &w ) : w_( w ) {}
+
+        void set_text( const std::string & );
+        void scroll_up();
+        void scroll_down();
+        void draw( const nc_color &base_color );
+    private:
+        int text_width();
+        int num_lines();
+        int max_offset();
+
+        catacurses::window &w_;
+        std::vector<std::string> text_;
+        int offset_ = 0;
+};
 
 class scrollingcombattext
 {
@@ -543,12 +817,10 @@ class scrollingcombattext
         class cSCT
         {
             private:
-                int iPosX;
-                int iPosY;
+                point pos;
                 direction oDir;
                 direction oUp, oUpRight, oRight, oDownRight, oDown, oDownLeft, oLeft, oUpLeft;
-                int iDirX;
-                int iDirY;
+                point dir;
                 int iStep;
                 int iStepOffset;
                 std::string sText;
@@ -559,10 +831,10 @@ class scrollingcombattext
                 bool iso_mode;
 
             public:
-                cSCT( const int p_iPosX, const int p_iPosY, direction p_oDir,
-                      const std::string p_sText, const game_message_type p_gmt,
-                      const std::string p_sText2 = "", const game_message_type p_gmt2 = m_neutral,
-                      const std::string p_sType = "" );
+                cSCT( const point &pos, direction p_oDir,
+                      const std::string &p_sText, game_message_type p_gmt,
+                      const std::string &p_sText2 = "", game_message_type p_gmt2 = m_neutral,
+                      const std::string &p_sType = "" );
 
                 int getStep() const {
                     return iStep;
@@ -582,40 +854,44 @@ class scrollingcombattext
                     return oDir;
                 }
                 int getInitPosX() const {
-                    return iPosX;
+                    return pos.x;
                 }
                 int getInitPosY() const {
-                    return iPosY;
+                    return pos.y;
                 }
                 std::string getType() const {
                     return sType;
                 }
-                std::string getText( std::string const &type = "full" ) const;
-                game_message_type getMsgType( std::string const &type = "first" ) const;
+                std::string getText( const std::string &type = "full" ) const;
+                game_message_type getMsgType( const std::string &type = "first" ) const;
         };
 
         std::vector<cSCT> vSCT;
 
-        void add( const int p_iPosX, const int p_iPosY, const direction p_oDir,
-                  const std::string p_sText, const game_message_type p_gmt,
-                  const std::string p_sText2 = "", const game_message_type p_gmt2 = m_neutral,
-                  const std::string p_sType = "" );
+        void add( const point &pos, direction p_oDir,
+                  const std::string &p_sText, game_message_type p_gmt,
+                  const std::string &p_sText2 = "", game_message_type p_gmt2 = m_neutral,
+                  const std::string &p_sType = "" );
         void advanceAllSteps();
         void removeCreatureHP();
 };
 
 extern scrollingcombattext SCT;
 
-std::string wildcard_trim_rule( const std::string &sPatternIn );
-bool wildcard_match( const std::string &sTextIn, const std::string &sPatternIn );
-std::vector<std::string> &wildcard_split( const std::string &s, char delim,
-        std::vector<std::string> &elems );
+std::string wildcard_trim_rule( const std::string &pattern_in );
+bool wildcard_match( const std::string &text_in, const std::string &pattern_in );
+std::vector<std::string> string_split( const std::string &text_in, char delim );
 int ci_find_substr( const std::string &str1, const std::string &str2,
                     const std::locale &loc = std::locale() );
 
 std::string format_volume( const units::volume &volume );
 std::string format_volume( const units::volume &volume, int width, bool *out_truncated,
                            double *out_value );
+
+inline std::string format_money( int cents )
+{
+    return string_format( _( "$%.2f" ), cents / 100.0 );
+}
 
 /** Get the width in font glyphs of the drawing screen.
  *
@@ -637,14 +913,10 @@ int get_terminal_height();
  * window.
  *
  * Ideally, of course, we'd have a unified tile drawing and ASCII
- * drawing API and use polymorphy, but for the time being there'll
+ * drawing API and use polymorphy, but for the time being there will
  * be a lot of switching around in the map drawing code.
  */
 bool is_draw_tiles_mode();
-
-void play_music( std::string playlist );
-
-void update_music_volume();
 
 /**
  * Make changes made to the display visible to the user immediately.
@@ -659,11 +931,11 @@ void refresh_display();
  * Assigns a custom color to each symbol.
  *
  * @param str String to colorize symbols in
- * @param func Function that accepts symbols (std::string::value_type) and returns colors.
+ * @param color_of Function that accepts symbols (std::string::value_type) and returns colors.
  * @return Colorized string.
  */
-template<typename Pred>
-std::string colorize_symbols( const std::string &str, Pred func )
+template<typename F>
+std::string colorize_symbols( const std::string &str, F color_of )
 {
     std::ostringstream res;
     nc_color prev_color = c_unset;
@@ -675,7 +947,7 @@ std::string colorize_symbols( const std::string &str, Pred func )
     };
 
     for( const auto &elem : str ) {
-        const nc_color new_color = func( elem );
+        const nc_color new_color = color_of( elem );
 
         if( prev_color != new_color ) {
             closing_tag();

@@ -1,17 +1,20 @@
 #include "overmap_location.h"
 
+#include <algorithm>
+#include <set>
+
 #include "generic_factory.h"
 #include "omdata.h"
-
-#include <algorithm>
-#include <unordered_map>
+#include "rng.h"
+#include "debug.h"
+#include "json.h"
 
 namespace
 {
 
 generic_factory<overmap_location> locations( "overmap location" );
 
-}
+} // namespace
 
 template<>
 bool string_id<overmap_location>::is_valid() const
@@ -27,30 +30,19 @@ const overmap_location &string_id<overmap_location>::obj() const
 
 bool overmap_location::test( const int_id<oter_t> &oter ) const
 {
-    const auto matches = [ &oter ]( const string_id<oter_type_t> &type ) {
+    return std::any_of( terrains.cbegin(), terrains.cend(),
+    [ &oter ]( const oter_type_str_id & type ) {
         return oter->type_is( type );
-    };
+    } );
+}
 
-    switch( mode ) {
-        case mode_t::allow:
-            return std::any_of( terrains.cbegin(), terrains.cend(), matches );
-        case mode_t::prohibit:
-            return std::none_of( terrains.cbegin(), terrains.cend(), matches );
-    }
-
-    return false;
+oter_type_id overmap_location::get_random_terrain() const
+{
+    return random_entry( terrains );
 }
 
 void overmap_location::load( JsonObject &jo, const std::string & )
 {
-    static const std::unordered_map<std::string, mode_t> mapping = {
-        { "allow",    mode_t::allow    },
-        { "prohibit", mode_t::prohibit }
-    };
-
-    typed_flag_reader<decltype( mapping )> reader{ mapping, "Invalid location mode" };
-
-    mandatory( jo, was_loaded, "mode", mode, reader );
     mandatory( jo, was_loaded, "terrains", terrains );
 
     if( terrains.empty() ) {

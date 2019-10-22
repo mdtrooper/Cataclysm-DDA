@@ -1,29 +1,23 @@
-#include <iostream>
-#include <sstream>
-#include <algorithm>
-#include <cmath>
-
 #include "scenario.h"
 
+#include <cstdlib>
+#include <algorithm>
+
 #include "debug.h"
-#include "json.h"
-#include "player.h"
-#include "bionics.h"
-#include "game.h"
-#include "map.h"
-#include "translations.h"
-#include "pldata.h"
-#include "addiction.h"
-#include "profession.h"
-#include "mutation.h"
-#include "mapgen.h"
 #include "generic_factory.h"
+#include "json.h"
+#include "map_extras.h"
+#include "mission.h"
+#include "mutation.h"
+#include "profession.h"
+#include "translations.h"
+#include "rng.h"
 
 namespace
 {
 generic_factory<scenario> all_scenarios( "scenario", "ident" );
 const string_id<scenario> generic_scenario_id( "evacuee" );
-}
+} // namespace
 
 /** @relates string_id */
 template<>
@@ -40,8 +34,10 @@ bool string_id<scenario>::is_valid() const
 }
 
 scenario::scenario()
-    : id( "" ), _name_male( "null" ), _name_female( "null" ),
-      _description_male( "null" ), _description_female( "null" )
+    : id( "" ), _name_male( no_translation( "null" ) ),
+      _name_female( no_translation( "null" ) ),
+      _description_male( no_translation( "null" ) ),
+      _description_female( no_translation( "null" ) )
 {
 }
 
@@ -57,24 +53,27 @@ void scenario::load( JsonObject &jo, const std::string & )
     if( !was_loaded || jo.has_string( "name" ) ) {
         // These may differ depending on the language settings!
         const std::string name = jo.get_string( "name" );
-        _name_female = pgettext( "scenario_female", name.c_str() );
-        _name_male = pgettext( "scenario_male", name.c_str() );
+        _name_female = to_translation( "scenario_female", name );
+        _name_male = to_translation( "scenario_male", name );
     }
 
     if( !was_loaded || jo.has_string( "description" ) ) {
         // These also may differ depending on the language settings!
         const std::string desc = jo.get_string( "description" );
-        _description_male = pgettext( "scen_desc_male", desc.c_str() );
-        _description_female = pgettext( "scen_desc_female", desc.c_str() );
+        _description_male = to_translation( "scen_desc_male", desc );
+        _description_female = to_translation( "scen_desc_female", desc );
     }
 
     if( !was_loaded || jo.has_string( "start_name" ) ) {
-        _start_name = pgettext( "start_name", jo.get_string( "start_name" ).c_str() );
+        // Specifying translation context here and above to avoid adding unnecessary json code for every scenario
+        // NOLINTNEXTLINE(cata-json-translation-input)
+        _start_name = to_translation( "start_name", jo.get_string( "start_name" ) );
     }
 
     mandatory( jo, was_loaded, "points", _point_cost );
 
     optional( jo, was_loaded, "blacklist_professions", blacklist );
+    optional( jo, was_loaded, "add_professions", extra_professions );
     optional( jo, was_loaded, "professions", professions,
               auto_flags_reader<string_id<profession>> {} );
 
@@ -86,7 +85,8 @@ void scenario::load( JsonObject &jo, const std::string & )
         jo.throw_error( "at least one starting location (member \"allowed_locs\") must be defined" );
     }
     optional( jo, was_loaded, "flags", flags, auto_flags_reader<> {} );
-    optional( jo, was_loaded, "map_special", _map_special, "mx_null" );
+    optional( jo, was_loaded, "map_extra", _map_extra, "mx_null" );
+    optional( jo, was_loaded, "missions", _missions, auto_flags_reader<mission_type_id> {} );
 }
 
 const scenario *scenario::generic()
@@ -105,9 +105,7 @@ const scenario *scenario::weighted_random()
 
     const auto &list = all_scenarios.get_all();
     while( true ) {
-        auto iter = list.begin();
-        std::advance( iter, rng( 0, list.size() - 1 ) );
-        const scenario &scen = *iter;
+        const scenario &scen = random_entry_ref( list );
 
         if( x_in_y( 2, abs( scen.point_cost() ) + 2 ) ) {
             return &scen;
@@ -133,7 +131,7 @@ void scenario::check_definitions()
     }
 }
 
-void check_traits( const std::set<trait_id> &traits, const string_id<scenario> &ident )
+static void check_traits( const std::set<trait_id> &traits, const string_id<scenario> &ident )
 {
     for( auto &t : traits ) {
         if( !t.is_valid() ) {
@@ -172,7 +170,18 @@ void scenario::check_definition() const
     check_traits( _allowed_traits, id );
     check_traits( _forced_traits, id );
     check_traits( _forbidden_traits, id );
-    MapExtras::get_function( _map_special ); // triggers a debug message upon invalid input
+    MapExtras::get_function( _map_extra ); // triggers a debug message upon invalid input
+
+    for( auto &m : _missions ) {
+        if( !m.is_valid() ) {
+            debugmsg( "starting mission %s for scenario %s does not exist", m.c_str(), id.c_str() );
+        }
+
+        if( std::find( m->origins.begin(), m->origins.end(), ORIGIN_GAME_START ) == m->origins.end() ) {
+            debugmsg( "starting mission %s for scenario %s must include an origin of ORIGIN_GAME_START",
+                      m.c_str(), id.c_str() );
+        }
+    }
 }
 
 const string_id<scenario> &scenario::ident() const
@@ -183,18 +192,18 @@ const string_id<scenario> &scenario::ident() const
 std::string scenario::gender_appropriate_name( bool male ) const
 {
     if( male ) {
-        return _name_male;
+        return _name_male.translated();
     } else {
-        return _name_female;
+        return _name_female.translated();
     }
 }
 
 std::string scenario::description( bool male ) const
 {
     if( male ) {
-        return _description_male;
+        return _description_male.translated();
     } else {
-        return _description_female;
+        return _description_female.translated();
     }
 }
 
@@ -225,6 +234,10 @@ std::vector<string_id<profession>> scenario::permitted_professions() const
                                         p.ident() ) != professions.end();
         if( blacklist || professions.empty() ) {
             if( !present && !p.has_flag( "SCEN_ONLY" ) ) {
+                res.push_back( p.ident() );
+            }
+        } else if( extra_professions ) {
+            if( present || !p.has_flag( "SCEN_ONLY" ) ) {
                 res.push_back( p.ident() );
             }
         } else if( present ) {
@@ -267,7 +280,7 @@ std::string scenario::prof_count_str() const
 
 std::string scenario::start_name() const
 {
-    return _start_name;
+    return _start_name.translated();
 }
 
 bool scenario::traitquery( const trait_id &trait ) const
@@ -291,7 +304,7 @@ bool scenario::is_forbidden_trait( const trait_id &trait ) const
     return _forbidden_traits.count( trait ) != 0;
 }
 
-bool scenario::has_flag( std::string flag ) const
+bool scenario::has_flag( const std::string &flag ) const
 {
     return flags.count( flag ) != 0;
 }
@@ -302,20 +315,20 @@ bool scenario::allowed_start( const start_location_id &loc ) const
     return std::find( vec.begin(), vec.end(), loc ) != vec.end();
 }
 
-bool scenario::can_pick( int points ) const
+bool scenario::can_pick( const scenario &current_scenario, const int points ) const
 {
-    if( point_cost() - g->scen->point_cost() > points ) {
-        return false;
-    }
-
-    return true;
+    return point_cost() - current_scenario.point_cost() <= points;
 }
-bool scenario::has_map_special() const
+bool scenario::has_map_extra() const
 {
-    return _map_special != "mx_null";
+    return _map_extra != "mx_null";
 }
-const std::string &scenario::get_map_special() const
+const std::string &scenario::get_map_extra() const
 {
-    return _map_special;
+    return _map_extra;
+}
+const std::vector<mission_type_id> &scenario::missions() const
+{
+    return _missions;
 }
 // vim:ts=4:sw=4:et:tw=0:fdm=marker:

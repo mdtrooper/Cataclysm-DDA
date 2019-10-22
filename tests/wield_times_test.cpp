@@ -1,17 +1,24 @@
-#include "catch/catch.hpp"
+#include <stdio.h>
+#include <string>
+#include <list>
+#include <memory>
 
-#include "player.h"
+#include "avatar.h"
+#include "catch/catch.hpp"
 #include "game.h"
 #include "map.h"
+#include "map_helpers.h"
+#include "player.h"
+#include "player_helpers.h"
+#include "item.h"
+#include "point.h"
 
-#include <string>
-
-void wield_check_internal( player &dummy, item &the_item, const char *section_text,
-                           const std::string &var_name, int expected_cost )
+static void wield_check_internal( player &dummy, item &the_item, const char *section_text,
+                                  const std::string &var_name, const int expected_cost )
 {
-    dummy.weapon = dummy.ret_null;
+    dummy.weapon = item();
     dummy.set_moves( 1000 );
-    int old_moves = dummy.moves;
+    const int old_moves = dummy.moves;
     dummy.wield( the_item );
     int move_cost = old_moves - dummy.moves;
     if( expected_cost < 0 ) {
@@ -28,38 +35,11 @@ void wield_check_internal( player &dummy, item &the_item, const char *section_te
 // As macro, so that we can generate the test cases for easy copypasting
 #define wield_check(section_text, dummy, the_item, expected_cost) \
     SECTION( section_text) { \
-        wield_check_internal(dummy, the_item, #section_text, #the_item, generating_cases ? -1 : expected_cost); \
+        wield_check_internal(dummy, the_item, #section_text, #the_item, generating_cases ? -1 : (expected_cost)); \
     }
 
-void prepare_test()
-{
-    player &dummy = g->u;
 
-    // Remove first worn item until there are none left.
-    std::list<item> temp;
-    while( dummy.takeoff( dummy.i_at( -2 ), &temp ) );
-    for( trait_id tr : dummy.get_mutations() ) {
-        dummy.unset_mutation( tr );
-    }
-    // Prevent spilling, but don't cause encumbrance
-    if( !dummy.has_trait( trait_id( "DEBUG_STORAGE" ) ) ) {
-        dummy.set_mutation( trait_id( "DEBUG_STORAGE" ) );
-    }
-
-    // Make stats nominal.
-    dummy.str_cur = 8;
-    dummy.dex_cur = 8;
-    dummy.int_cur = 8;
-    dummy.per_cur = 8;
-
-    const tripoint spot( 60, 60, 0 );
-    dummy.setpos( spot );
-    g->m.ter_set( spot, ter_id( "t_dirt" ) );
-    g->m.furn_set( spot, furn_id( "f_null" ) );
-    g->m.i_clear( spot );
-}
-
-void do_test( bool generating_cases )
+static void do_test( const bool generating_cases )
 {
     player &dummy = g->u;
     const tripoint spot = dummy.pos();
@@ -100,12 +80,14 @@ void do_test( bool generating_cases )
 
 TEST_CASE( "Wield time test", "[wield]" )
 {
-    prepare_test();
+    clear_player();
+    clear_map();
     do_test( false );
 }
 
 TEST_CASE( "Wield time make cases", "[.]" )
 {
-    prepare_test();
+    clear_player();
+    clear_map();
     do_test( true );
 }

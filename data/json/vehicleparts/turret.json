@@ -2,11 +2,117 @@
   {
     "abstract": "turret",
     "type": "vehicle_part",
-    "location": "on_roof",
     "symbol": "t",
     "durability": 400,
     "damage_modifier": 80,
-    "flags": [ "TURRET" ]
+    "location": "on_roof",
+    "flags": [ "TURRET", "TOOL_NONE" ]
+  },
+  {
+    "id": "mounted_chemical_thrower",
+    "copy-from": "turret",
+    "type": "vehicle_part",
+    "name": "mounted makeshift chemical thrower",
+    "item": "chemical_thrower",
+    "color": "dark_gray",
+    "broken_color": "dark_gray",
+    "difficulty": 5,
+    "breaks_into": [ { "item": "chemical_thrower", "prob": 50 } ],
+    "//": "doesn't work correctly if using ammo from vehicle tanks at the moment, so uses the usual magazines",
+    "requirements": {
+      "install": { "skills": [ [ "mechanics", 5 ], [ "launcher", 1 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
+    }
+  },
+  {
+    "id": "mounted_heavy_rail_rifle",
+    "copy-from": "turret",
+    "type": "vehicle_part",
+    "name": "mounted heavy rail rifle",
+    "item": "heavy_rail_rifle",
+    "color": "magenta",
+    "broken_color": "magenta",
+    "difficulty": 5,
+    "breaks_into": [ { "item": "heavy_rail_rifle", "prob": 50 } ],
+    "requirements": {
+      "install": { "skills": [ [ "mechanics", 5 ], [ "electronics", 5 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
+    }
+  },
+  {
+    "id": "mounted_emp_gun",
+    "copy-from": "turret",
+    "type": "vehicle_part",
+    "name": "mounted XM34 EMP projector",
+    "item": "emp_gun",
+    "color": "magenta",
+    "broken_color": "magenta",
+    "difficulty": 5,
+    "breaks_into": [ { "item": "emp_gun", "prob": 50 } ],
+    "requirements": {
+      "install": { "skills": [ [ "mechanics", 5 ], [ "electronics", 5 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
+    }
+  },
+  {
+    "id": "mounted_rebar_rifle",
+    "copy-from": "turret",
+    "type": "vehicle_part",
+    "name": "mounted ferromagnetic rail rifle",
+    "item": "rebar_rifle",
+    "color": "magenta",
+    "broken_color": "magenta",
+    "difficulty": 5,
+    "breaks_into": [ { "item": "rebar_rifle", "prob": 50 } ],
+    "requirements": {
+      "install": { "skills": [ [ "mechanics", 5 ], [ "electronics", 5 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
+    }
+  },
+  {
+    "id": "mounted_coilgun",
+    "copy-from": "turret",
+    "type": "vehicle_part",
+    "name": "mounted coilgun",
+    "item": "coilgun",
+    "color": "magenta",
+    "broken_color": "magenta",
+    "difficulty": 5,
+    "breaks_into": [ { "item": "coilgun", "prob": 50 } ],
+    "requirements": {
+      "install": { "skills": [ [ "mechanics", 5 ], [ "electronics", 5 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
+    }
+  },
+  {
+    "id": "mounted_hk_g80",
+    "copy-from": "turret",
+    "type": "vehicle_part",
+    "name": "mounted H&K G80 Railgun",
+    "item": "hk_g80",
+    "color": "magenta",
+    "broken_color": "magenta",
+    "difficulty": 5,
+    "breaks_into": [ { "item": "hk_g80", "prob": 50 } ],
+    "requirements": {
+      "install": { "skills": [ [ "mechanics", 5 ], [ "electronics", 5 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
+    }
+  },
+  {
+    "id": "mounted_mininuke_launcher",
+    "copy-from": "turret",
+    "type": "vehicle_part",
+    "name": "mounted mininuke launcher",
+    "item": "mininuke_launcher",
+    "color": "green",
+    "broken_color": "green",
+    "difficulty": 8,
+    "breaks_into": [ { "item": "mininuke_launcher", "prob": 50 } ],
+    "requirements": {
+      "install": { "skills": [ [ "mechanics", 5 ], [ "launcher", 3 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
+    }
   },
   {
     "id": "flamethrower",
@@ -20,38 +126,24 @@
     "difficulty": 5,
     "breaks_into": [ { "item": "flamethrower", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 5 ], [ "launcher", 1 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 3 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 5 ], [ "launcher", 1 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
     },
     "extend": { "flags": [ "USE_TANKS" ] }
   },
   {
-    "id": "fusion_gun",
+    "id": "mounted_plasma_gun",
     "copy-from": "turret",
     "type": "vehicle_part",
-    "name": "mounted fusion gun",
-    "item": "ftk93",
+    "name": "mounted PPA-5 plasma gun",
+    "item": "plasma_gun",
     "color": "magenta",
     "broken_color": "magenta",
     "difficulty": 6,
-    "breaks_into": [ { "item": "ftk93", "prob": 50 } ],
+    "breaks_into": [ { "item": "plasma_gun", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 6 ], [ "electronics", 6 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 4 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 6 ], [ "electronics", 6 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 4 ] ] }
     }
   },
   {
@@ -65,15 +157,23 @@
     "difficulty": 5,
     "breaks_into": [ { "item": "laser_rifle", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 5 ], [ "electronics", 5 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 3 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 5 ], [ "electronics", 5 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
+    }
+  },
+  {
+    "id": "laser_cannon",
+    "copy-from": "turret",
+    "type": "vehicle_part",
+    "name": "mounted Cerberus laser cannon",
+    "item": "laser_cannon",
+    "color": "magenta",
+    "broken_color": "magenta",
+    "difficulty": 5,
+    "breaks_into": [ { "item": "laser_cannon", "prob": 50 } ],
+    "requirements": {
+      "install": { "skills": [ [ "mechanics", 5 ], [ "electronics", 5 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
     }
   },
   {
@@ -87,15 +187,8 @@
     "difficulty": 3,
     "breaks_into": [ { "item": "m249", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 3 ], [ "rifle", 1 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 1 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 3 ], [ "rifle", 1 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 1 ] ] }
     }
   },
   {
@@ -109,15 +202,8 @@
     "difficulty": 3,
     "breaks_into": [ { "item": "abzats", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 3 ], [ "shotgun", 1 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 1 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 3 ], [ "shotgun", 1 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 1 ] ] }
     }
   },
   {
@@ -131,15 +217,8 @@
     "difficulty": 4,
     "breaks_into": [ { "item": "m2browning", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 4 ], [ "rifle", 2 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 2 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 4 ], [ "rifle", 2 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 2 ] ] }
     }
   },
   {
@@ -153,15 +232,8 @@
     "difficulty": 6,
     "breaks_into": [ { "item": "m134", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 6 ], [ "rifle", 3 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 4 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 6 ], [ "rifle", 3 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 4 ] ] }
     }
   },
   {
@@ -175,15 +247,8 @@
     "difficulty": 4,
     "breaks_into": [ { "item": "m1918", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 4 ], [ "rifle", 2 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 2 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 4 ], [ "rifle", 2 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 2 ] ] }
     }
   },
   {
@@ -197,15 +262,8 @@
     "difficulty": 4,
     "breaks_into": [ { "item": "m240", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 4 ], [ "rifle", 2 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 2 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 4 ], [ "rifle", 2 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 2 ] ] }
     }
   },
   {
@@ -219,15 +277,8 @@
     "difficulty": 4,
     "breaks_into": [ { "item": "m60", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 4 ], [ "rifle", 2 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 2 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 4 ], [ "rifle", 2 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 2 ] ] }
     }
   },
   {
@@ -241,15 +292,24 @@
     "difficulty": 5,
     "breaks_into": [ { "item": "mark19", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 5 ], [ "launcher", 1 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 3 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 5 ], [ "launcher", 1 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
+    }
+  },
+  {
+    "id": "tow_launcher",
+    "copy-from": "turret",
+    "type": "vehicle_part",
+    "name": "mounted BGM-71F TOW",
+    "item": "atgm_launcher",
+    "color": "green",
+    "broken_color": "green",
+    "durability": 800,
+    "difficulty": 8,
+    "breaks_into": [ { "item": "atgm_launcher", "prob": 50 } ],
+    "requirements": {
+      "install": { "skills": [ [ "mechanics", 5 ], [ "launcher", 3 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
     }
   },
   {
@@ -263,15 +323,8 @@
     "difficulty": 6,
     "breaks_into": [ { "item": "rm298", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 5 ], [ "rifle", 2 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 3 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 5 ], [ "rifle", 2 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
     }
   },
   {
@@ -285,37 +338,23 @@
     "difficulty": 6,
     "breaks_into": [ { "item": "rm614_lmg", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 5 ], [ "rifle", 2 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 3 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 5 ], [ "rifle", 2 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
     }
   },
   {
     "id": "plasma_gun",
     "copy-from": "turret",
     "type": "vehicle_part",
-    "name": "mounted plasma gun",
+    "name": "mounted Boeing XM-P plasma rifle",
     "item": "plasma_rifle",
     "color": "light_blue",
     "broken_color": "light_blue",
     "difficulty": 5,
     "breaks_into": [ { "item": "plasma_rifle", "prob": 50 } ],
     "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 5 ], [ "electronics", 5 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 3 ] ],
-        "using": "vehicle_weld_removal"
-      }
+      "install": { "skills": [ [ "mechanics", 5 ], [ "electronics", 5 ] ], "time": 10000 },
+      "removal": { "skills": [ [ "mechanics", 3 ] ] }
     }
   },
   {
@@ -329,17 +368,7 @@
     "broken_color": "blue",
     "difficulty": 4,
     "breaks_into": [ { "item": "watercannon", "prob": 50 } ],
-    "requirements": {
-      "install": {
-        "skills": [ [ "mechanics", 4 ] ],
-        "time": 120000,
-        "using": [ [ "welding_standard", 10 ] ]
-      },
-      "removal": {
-        "skills": [ [ "mechanics", 2 ] ],
-        "using": "vehicle_weld_removal"
-      }
-    },
+    "requirements": { "install": { "skills": [ [ "mechanics", 4 ] ], "time": 10000 }, "removal": { "skills": [ [ "mechanics", 2 ] ] } },
     "extend": { "flags": [ "USE_TANKS" ] }
   }
 ]

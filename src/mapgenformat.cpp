@@ -1,21 +1,17 @@
-#include <iostream>
+#include "mapgenformat.h"
 
+#include <cctype>
+#include <algorithm>
 #include <string>
 
-#include <cassert>
-#include <stdarg.h>
-#include <algorithm>
-
-#include "output.h"
-#include "mapdata.h"
 #include "map.h"
-#include "mapgenformat.h"
+#include "mapdata.h"
 
 namespace mapf
 {
 
 void formatted_set_simple( map *m, const int startx, const int starty, const char *cstr,
-                           format_effect<ter_id> ter_b, format_effect<furn_id> furn_b )
+                           const format_effect<ter_id> &ter_b, const format_effect<furn_id> &furn_b )
 {
     const char *p = cstr;
     int x = startx;
@@ -28,13 +24,13 @@ void formatted_set_simple( map *m, const int startx, const int starty, const cha
             const ter_id ter = ter_b.translate( *p );
             const furn_id furn = furn_b.translate( *p );
             if( ter != t_null ) {
-                m->ter_set( x, y, ter );
+                m->ter_set( point( x, y ), ter );
             }
             if( furn != f_null ) {
                 if( furn == f_toilet ) {
-                    m->place_toilet( x, y );
+                    m->place_toilet( point( x, y ) );
                 } else {
-                    m->furn_set( x, y, furn );
+                    m->furn_set( point( x, y ), furn );
                 }
             }
             x++;
@@ -44,7 +40,7 @@ void formatted_set_simple( map *m, const int startx, const int starty, const cha
 }
 
 template<typename ID>
-format_effect<ID>::format_effect( std::string chars, std::vector<ID> dets )
+format_effect<ID>::format_effect( const std::string &chars, std::vector<ID> dets )
     : characters( chars ), determiners( dets )
 {
     characters.erase( std::remove_if( characters.begin(), characters.end(), isspace ),

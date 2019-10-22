@@ -2,16 +2,22 @@
 #ifndef VITAMIN_H
 #define VITAMIN_H
 
-#include "json.h"
-#include "effect.h"
+#include <map>
+#include <utility>
+#include <vector>
+#include <string>
 
-class vitamin;
-using vitamin_id = string_id<vitamin>;
+#include "calendar.h"
+#include "string_id.h"
+#include "translations.h"
+#include "type_id.h"
+
+class JsonObject;
 
 class vitamin
 {
     public:
-        vitamin() : id_( vitamin_id( "null" ) ) {}
+        vitamin() : id_( vitamin_id( "null" ) ), rate_( 1_hours ) {}
 
         const vitamin_id &id() const {
             return id_;
@@ -21,8 +27,8 @@ class vitamin
             return id_ == vitamin_id( "null" );
         }
 
-        const std::string &name() const {
-            return name_;
+        std::string name() const {
+            return name_.translated();
         }
 
         /** Disease effect with increasing intensity proportional to vitamin deficiency */
@@ -46,11 +52,10 @@ class vitamin
         }
 
         /**
-         * Usage rate of vitamin (turns to consume unit)
+         * Usage rate of vitamin (time to consume unit)
          * Lower bound is zero whereby vitamin is not required (but may still accumulate)
-         * If unspecified in JSON a default value of 60 minutes is used
          */
-        int rate() const {
+        time_duration rate() const {
             return rate_;
         }
 
@@ -71,13 +76,14 @@ class vitamin
 
     private:
         vitamin_id id_;
-        std::string name_;
+        translation name_;
         efftype_id deficiency_;
         efftype_id excess_;
         int min_;
         int max_;
-        int rate_;
+        time_duration rate_;
         std::vector<std::pair<int, int>> disease_;
+        std::vector<std::pair<int, int>> disease_excess_;
 };
 
 #endif

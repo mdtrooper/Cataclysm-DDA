@@ -2,8 +2,12 @@
 #ifndef LIVE_VIEW_H
 #define LIVE_VIEW_H
 
-#include "cursesdef.h" // WINDOW
-#include "enums.h"     // tripoint
+#include "point.h"
+
+namespace catacurses
+{
+class window;
+} // namespace catacurses
 
 class live_view
 {
@@ -11,9 +15,8 @@ class live_view
         live_view() = default;
 
         void init();
-        int draw( WINDOW *win, int max_height );
-        void refresh();
-        void show( const tripoint &mouse_position );
+        int draw( const catacurses::window &win, int max_height );
+        void show( const tripoint &p );
         void hide();
 
     private:

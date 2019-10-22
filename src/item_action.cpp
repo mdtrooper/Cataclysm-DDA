@@ -1,65 +1,61 @@
-#include "action.h"
-#include "output.h"
-#include "options.h"
-#include "path_info.h"
-#include "debug.h"
-#include "game.h"
-#include "options.h"
-#include "messages.h"
-#include "inventory.h"
-#include "item_factory.h"
 #include "item_action.h"
-#include "iuse_actor.h"
-#include "translations.h"
-#include "input.h"
-#include "itype.h"
-#include "ui.h"
-#include "player.h"
 
 #include <algorithm>
-#include <istream>
-#include <sstream>
 #include <iterator>
+#include <sstream>
+#include <list>
+#include <memory>
+#include <set>
+#include <tuple>
+#include <unordered_set>
+#include <utility>
+
+#include "avatar.h"
+#include "debug.h"
+#include "game.h"
+#include "input.h"
+#include "inventory.h"
+#include "item.h"
+#include "item_factory.h"
+#include "itype.h"
+#include "json.h"
+#include "output.h"
+#include "player.h"
+#include "ret_val.h"
+#include "translations.h"
+#include "ui.h"
+#include "calendar.h"
+#include "catacharset.h"
+#include "cursesdef.h"
+#include "iuse.h"
+#include "type_id.h"
+
+struct tripoint;
 
 static item_action nullaction;
 static const std::string errstring( "ERROR" );
 
-int clamp( int value, int low, int high )
-{
-    return ( value < low ) ? low : ( ( value > high ) ? high : value );
-}
-
-char key_bound_to( const input_context &ctxt, const item_action_id &act )
+static char key_bound_to( const input_context &ctxt, const item_action_id &act )
 {
     auto keys = ctxt.keys_bound_to( act );
     return keys.empty() ? '\0' : keys[0];
 }
 
-class actmenu_cb : public uimenu_callback
+class actmenu_cb : public uilist_callback
 {
     private:
-        input_context ctxt;
         const action_map am;
     public:
-        actmenu_cb( const action_map &acm ) : ctxt( "ITEM_ACTIONS" ), am( acm ) {
-            ctxt.register_action( "HELP_KEYBINDINGS" );
-            ctxt.register_action( "QUIT" );
-            for( const auto &id : am ) {
-                ctxt.register_action( id.first, id.second.name );
-            }
-        }
-        ~actmenu_cb() override { }
+        actmenu_cb( const action_map &acm ) : am( acm ) { }
+        ~actmenu_cb() override = default;
 
-        bool key( const input_event &event, int idx, uimenu * /*menu*/ ) override {
-            const std::string action = ctxt.input_to_action( event );
-            if( action == "HELP_KEYBINDINGS" ) {
-                ctxt.display_help();
-                return true;
-            }
+        bool key( const input_context &ctxt, const input_event &event, int /*idx*/,
+                  uilist * /*menu*/ ) override {
+            const std::string &action = ctxt.input_to_action( event );
             // Don't write a message if unknown command was sent
             // Only when an inexistent tool was selected
-            auto itemless_action = am.find( action );
-            if( itemless_action != am.end() && idx == -1 ) {
+            const auto itemless_action = am.find( action );
+            if( itemless_action != am.end() ) {
                 popup( _( "You do not have an item that can perform this action." ) );
                 return true;
             }
@@ -72,7 +68,7 @@ item_action_generator::item_action_generator() = default;
 item_action_generator::~item_action_generator() = default;
 
 // Get use methods of this item and its contents
-bool item_has_uses_recursive( const item &it )
+static bool item_has_uses_recursive( const item &it )
 {
     if( !it.type->use_methods.empty() ) {
         return true;
@@ -121,10 +117,16 @@ item_action_map item_action_generator::map_actions_to_items( player &p,
 
             const use_function *func = actual_item->get_use( use );
             if( !( func && func->get_actor_ptr() &&
-                   func->get_actor_ptr()->can_use( p, *actual_item, false, p.pos() ) ) ) {
+                   func->get_actor_ptr()->can_use( p, *actual_item, false, p.pos() ).success() ) ) {
                 continue;
             }
             if( !actual_item->ammo_sufficient() ) {
+                continue;
+            }
+
+            // Don't try to remove 'irremovable' toolmods
+            if( actual_item->is_toolmod() && use == item_action_id( "TOOLMOD_ATTACH" ) &&
+                actual_item->has_flag( "IRREMOVABLE" ) ) {
                 continue;
             }
 
@@ -163,7 +165,7 @@ std::string item_action_generator::get_action_name( const item_action_id &id ) c
 {
     const auto &act = get_action( id );
     if( !act.name.empty() ) {
-        return _( act.name.c_str() );
+        return act.name.translated();
     }
 
     return id;
@@ -190,11 +192,8 @@ void item_action_generator::load_item_action( JsonObject &jo )
     item_action ia;
 
     ia.id = jo.get_string( "id" );
-    ia.name = jo.get_string( "name", "" );
-    if( !ia.name.empty() ) {
-        ia.name = _( ia.name.c_str() );
-    } else {
-        ia.name = ia.id;
+    if( !jo.read( "name", ia.name ) || ia.name.empty() ) {
+        ia.name = no_translation( ia.id );
     }
 
     item_actions[ia.id] = ia;
@@ -222,16 +221,24 @@ void game::item_action_menu()
     if( u.has_active_bionic( bionic_id( "bio_tools" ) ) ) {
         pseudos.push_back( &toolset );
     }
+    item bio_claws( "bio_claws_weapon", calendar::turn );
+    if( u.has_active_bionic( bionic_id( "bio_claws" ) ) ) {
+        pseudos.push_back( &bio_claws );
+    }
 
     item_action_map iactions = gen.map_actions_to_items( u, pseudos );
     if( iactions.empty() ) {
         popup( _( "You don't have any items with registered uses" ) );
     }
 
-    uimenu kmenu;
+    uilist kmenu;
     kmenu.text = _( "Execute which action?" );
-    kmenu.return_invalid = true;
+    kmenu.input_category = "ITEM_ACTIONS";
     input_context ctxt( "ITEM_ACTIONS" );
+    for( const auto &id : item_actions ) {
+        ctxt.register_action( id.first, id.second.name.translated() );
+        kmenu.additional_actions.emplace_back( id.first, id.second.name.translated() );
+    }
     actmenu_cb callback( item_actions );
     kmenu.callback = &callback;
     int num = 0;
@@ -242,7 +249,7 @@ void game::item_action_menu()
 
     std::vector<std::tuple<item_action_id, std::string, std::string>> menu_items;
     // Sorts menu items by action.
-    typedef decltype( menu_items )::iterator Iter;
+    using Iter = decltype( menu_items )::iterator;
     const auto sort_menu = []( Iter from, Iter to ) {
         std::sort( from, to, []( const std::tuple<item_action_id, std::string, std::string> &lhs,
         const std::tuple<item_action_id, std::string, std::string> &rhs ) {
@@ -298,20 +305,20 @@ void game::item_action_menu()
     }
 
     kmenu.query();
-    if( kmenu.ret < 0 || kmenu.ret >= ( int )iactions.size() ) {
+    if( kmenu.ret < 0 || kmenu.ret >= static_cast<int>( iactions.size() ) ) {
         return;
     }
 
     draw_ter();
+    wrefresh( w_terrain );
+    draw_panels( true );
 
     const item_action_id action = std::get<0>( menu_items[kmenu.ret] );
     item *it = iactions[action];
 
-    if( u.invoke_item( it, action ) ) {
-        u.i_rem( it ); // Need to remove item
-    }
+    u.invoke_item( it, action );
 
-    u.inv.restack( &u );
+    u.inv.restack( u );
     u.inv.unsort();
 }
 
@@ -322,6 +329,11 @@ std::string use_function::get_type() const
     } else {
         return errstring;
     }
+}
+
+ret_val<bool> iuse_actor::can_use( const Character &, const item &, bool, const tripoint & ) const
+{
+    return ret_val<bool>::make_success();
 }
 
 bool iuse_actor::is_valid() const
